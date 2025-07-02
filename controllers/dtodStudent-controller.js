@@ -1,7 +1,23 @@
-// Get all D2D students
+// Get all D2D students for a specific admin (school) and/or class
 exports.getAllDtodStudents = async (req, res) => {
     try {
-        const students = await DtodStudent.find({}).populate("sclassName", "sclassName");
+        // Accept adminId (school) and/or classId as query params
+        const { adminId, classId } = req.query;
+        let filter = {};
+        if (classId) {
+            filter.sclassName = classId;
+        }
+        // If adminId is provided, filter by sclassName.school
+        let studentsQuery = DtodStudent.find(filter).populate({
+            path: 'sclassName',
+            select: 'sclassName school',
+            populate: { path: 'school', select: 'schoolName' }
+        });
+        let students = await studentsQuery;
+        // If adminId is provided, filter students by sclassName.school
+        if (adminId) {
+            students = students.filter(s => s.sclassName && s.sclassName.school && s.sclassName.school._id.toString() === adminId);
+        }
         res.json(students);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
