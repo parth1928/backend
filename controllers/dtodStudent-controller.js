@@ -3,7 +3,7 @@ exports.getAllDtodStudents = async (req, res) => {
     try {
         const { adminId, classId } = req.query;
         let filter = {};
-        if (adminId) filter.adminID = adminId;
+        if (adminId) filter.school = adminId;
         if (classId) filter.sclassName = classId;
         const students = await DtodStudent.find(filter).populate({
             path: 'sclassName',
@@ -27,10 +27,10 @@ exports.bulkUploadDtodStudents = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
         const students = await csv().fromString(req.file.buffer.toString());
-        // Use sclassName and adminID from form data (selected in UI)
+        // Use sclassName and school from form data (selected in UI)
         const sclassName = req.body.sclassName;
-        const adminID = req.body.adminID;
-        if (!sclassName || !adminID) {
+        const school = req.body.school;
+        if (!sclassName || !school) {
             return res.status(400).json({ success: false, message: 'No class or admin selected' });
         }
         const dtodStudents = students.map(s => ({
@@ -38,7 +38,7 @@ exports.bulkUploadDtodStudents = async (req, res) => {
             rollNum: s.rollNum,
             email: s.email,
             sclassName: sclassName,
-            adminID: adminID
+            school: school
         }));
         await DtodStudent.insertMany(dtodStudents, { ordered: false });
         res.json({ success: true, message: 'D2D students uploaded successfully' });
