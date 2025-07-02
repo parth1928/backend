@@ -1,23 +1,15 @@
-// Get all D2D students for a specific admin (school) and/or class
+// Get all D2D students for a specific admin and/or class
 exports.getAllDtodStudents = async (req, res) => {
     try {
-        // Accept adminId (school) and/or classId as query params
         const { adminId, classId } = req.query;
         let filter = {};
-        if (classId) {
-            filter.sclassName = classId;
-        }
-        // If adminId is provided, filter by sclassName.school
-        let studentsQuery = DtodStudent.find(filter).populate({
+        if (adminId) filter.adminID = adminId;
+        if (classId) filter.sclassName = classId;
+        const students = await DtodStudent.find(filter).populate({
             path: 'sclassName',
             select: 'sclassName school',
             populate: { path: 'school', select: 'schoolName' }
         });
-        let students = await studentsQuery;
-        // If adminId is provided, filter students by sclassName.school
-        if (adminId) {
-            students = students.filter(s => s.sclassName && s.sclassName.school && s.sclassName.school._id.toString() === adminId);
-        }
         res.json(students);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -35,16 +27,18 @@ exports.bulkUploadDtodStudents = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
         const students = await csv().fromString(req.file.buffer.toString());
-        // Use sclassName from form data (selected in UI)
+        // Use sclassName and adminID from form data (selected in UI)
         const sclassName = req.body.sclassName;
-        if (!sclassName) {
-            return res.status(400).json({ success: false, message: 'No class selected' });
+        const adminID = req.body.adminID;
+        if (!sclassName || !adminID) {
+            return res.status(400).json({ success: false, message: 'No class or admin selected' });
         }
         const dtodStudents = students.map(s => ({
             name: s.name,
             rollNum: s.rollNum,
             email: s.email,
             sclassName: sclassName,
+            adminID: adminID
         }));
         await DtodStudent.insertMany(dtodStudents, { ordered: false });
         res.json({ success: true, message: 'D2D students uploaded successfully' });

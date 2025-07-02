@@ -6,6 +6,7 @@ const dtodStudentSchema = new mongoose.Schema({
     rollNum: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     sclassName: { type: mongoose.Schema.Types.ObjectId, ref: 'sclass' },
+    school: { type: mongoose.Schema.Types.ObjectId, ref: 'admin', required: true },
     createdAt: { type: Date, default: Date.now },
     attendance: [{
         date: {
