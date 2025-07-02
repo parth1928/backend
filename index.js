@@ -1,3 +1,12 @@
+// JWT utility example
+const jwt = require('jsonwebtoken');
+
+// Example function to create a JWT (can be moved to a utils file or used in controllers)
+function createJWT(payload) {
+    const secret = process.env.JWT_SECRET || 'defaultsecret';
+    return jwt.sign(payload, secret, { expiresIn: '1h' });
+}
+
 const express = require("express")
 const cors = require("cors")
 const mongoose = require("mongoose")
