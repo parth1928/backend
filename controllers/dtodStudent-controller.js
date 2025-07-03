@@ -5,6 +5,7 @@ exports.getAllDtodStudents = async (req, res) => {
         let filter = {};
         if (adminId) filter.school = adminId;
         if (classId) filter.sclassName = classId;
+        console.log('D2D fetch filter:', filter); // Debug log
         const students = await DtodStudent.find(filter).populate({
             path: 'sclassName',
             select: 'sclassName school',
