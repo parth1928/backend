@@ -62,7 +62,8 @@ const studentLogIn = async (req, res) => {
 const getStudents = async (req, res) => {
     try {
         let students = await Student.find({ school: req.params.id }).populate("sclassName", "sclassName");
-        let dtodStudents = await DtodStudent.find({}).populate("sclassName", "sclassName"); // Populate class name
+        // Only fetch D2D students for this admin
+        let dtodStudents = await DtodStudent.find({ school: req.query.adminId }).populate("sclassName", "sclassName");
         let modifiedStudents = students.map((student) => {
             return { ...student._doc, password: undefined, type: 'Regular' };
         });

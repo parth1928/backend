@@ -28,7 +28,7 @@ const quickMarkAttendance = async (req, res) => {
         let matchedStudent;
         if (isDtod) {
             // Find D2D students in the class
-            const students = await DtodStudent.find({ sclassName: classId });
+            const students = await DtodStudent.find({ sclassName: classId, school: req.query.adminId });
             console.log('Found D2D students in class:', students.map(s => ({ name: s.name, roll: s.rollNum })));
             matchedStudent = students.find(student => {
                 const rollStr = student.rollNum.toString();

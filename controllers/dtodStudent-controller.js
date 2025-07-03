@@ -65,7 +65,9 @@ exports.deleteDtodStudent = async (req, res) => {
 // Get D2D student detail by ID
 exports.getDtodStudentDetail = async (req, res) => {
     try {
-        const student = await DtodStudent.findById(req.params.id)
+        // Only allow fetching if the student belongs to the current admin
+        const adminId = req.query.adminId;
+        const student = await DtodStudent.findOne({ _id: req.params.id, ...(adminId ? { school: adminId } : {}) })
             .populate("sclassName", "sclassName")
             .populate("school", "schoolName");
         if (student) {
