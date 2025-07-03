@@ -1,3 +1,26 @@
+// Bulk register students
+const bulkRegisterStudents = async (req, res) => {
+    try {
+        const students = req.body.students; // Array of student objects
+        if (!Array.isArray(students) || students.length === 0) {
+            return res.status(400).json({ message: "No students provided" });
+        }
+        const salt = await bcrypt.genSalt(10);
+        const studentsToInsert = await Promise.all(students.map(async (student) => {
+            const hashedPass = await bcrypt.hash(student.password, salt);
+            return {
+                ...student,
+                school: student.adminID,
+                password: hashedPass
+            };
+        }));
+        const result = await Student.insertMany(studentsToInsert);
+        res.send(result.map(s => ({ ...s._doc, password: undefined })));
+    } catch (err) {
+        console.log(err);
+        res.status(500).json(err);
+    }
+};
 const bcrypt = require('bcrypt');
 const Student = require('../models/studentSchema.js');
 const Subject = require('../models/subjectSchema.js');
@@ -91,11 +114,8 @@ const getStudents = async (req, res) => {
         });
         // Combine both lists
         let allStudents = [...modifiedStudents, ...modifiedDtodStudents];
-        if (allStudents.length > 0) {
-            res.send(allStudents);
-        } else {
-            res.send({ message: "No students found" });
-        }
+        // Always return the array, even if it's empty (frontend should handle empty array)
+        res.send(allStudents);
     } catch (err) {
         console.log(err);
         res.status(500).json(err);
@@ -329,4 +349,5 @@ module.exports = {
     clearAllStudentsAttendance,
     removeStudentAttendanceBySubject,
     removeStudentAttendance,
+    bulkRegisterStudents,
 };
