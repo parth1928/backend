@@ -61,9 +61,21 @@ const studentLogIn = async (req, res) => {
 
 const getStudents = async (req, res) => {
     try {
+        const mongoose = require('mongoose');
         let students = await Student.find({ school: req.params.id }).populate("sclassName", "sclassName");
-        // Only fetch D2D students for this admin
-        let dtodStudents = await DtodStudent.find({ school: req.query.adminId }).populate("sclassName", "sclassName");
+        // Debug: log adminId and filter
+        console.log('Fetching D2D students for adminId:', req.query.adminId);
+        let adminObjectId;
+        try {
+            adminObjectId = new mongoose.Types.ObjectId(req.query.adminId);
+        } catch (e) {
+            console.log('Invalid adminId for ObjectId:', req.query.adminId);
+            adminObjectId = null;
+        }
+        let dtodStudents = [];
+        if (adminObjectId) {
+            dtodStudents = await DtodStudent.find({ school: adminObjectId }).populate("sclassName", "sclassName");
+        }
         let modifiedStudents = students.map((student) => {
             return { ...student._doc, password: undefined, type: 'Regular' };
         });
