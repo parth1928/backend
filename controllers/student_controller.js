@@ -75,6 +75,13 @@ const getStudents = async (req, res) => {
         let dtodStudents = [];
         if (adminObjectId) {
             dtodStudents = await DtodStudent.find({ school: adminObjectId }).populate("sclassName", "sclassName");
+            if (dtodStudents.length === 0) {
+                console.warn('No D2D students found for adminId:', adminObjectId.toString());
+            } else {
+                console.log('D2D students found:', dtodStudents.map(s => ({ _id: s._id, name: s.name, school: s.school })));
+            }
+        } else {
+            console.warn('Skipping D2D student fetch due to invalid adminId.');
         }
         let modifiedStudents = students.map((student) => {
             return { ...student._doc, password: undefined, type: 'Regular' };
