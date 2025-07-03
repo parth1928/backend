@@ -29,6 +29,7 @@ const {
 // Bulk register regular students
 router.post('/Students/BulkRegister', bulkRegisterStudents);
 const { subjectCreate, classSubjects, deleteSubjectsByClass, getSubjectDetail, deleteSubject, freeSubjectList, allSubjects, deleteSubjects } = require('../controllers/subject-controller.js');
+const { updateSubjectBatches } = require('../controllers/batch-controller.js');
 const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeachers, deleteTeachersByClass, deleteTeacher, updateTeacherSubject, teacherAttendance } = require('../controllers/teacher-controller.js');
 const { downloadAttendanceExcel } = require('../controllers/attendance-controller.js');
 const { quickMarkAttendance, submitQuickAttendance } = require('../controllers/quickAttendance-controller.js');
@@ -115,15 +116,14 @@ router.get("/Sclass/Students/:id", getSclassStudents)
 router.delete("/Sclasses/:id", deleteSclasses)
 router.delete("/Sclass/:id", deleteSclass)
 
+
 // Subject
-
 router.post('/SubjectCreate', subjectCreate);
-
+router.put('/Subject/:subjectId/batches', updateSubjectBatches); // <-- New route for batch assignment
 router.get('/AllSubjects/:id', allSubjects);
 router.get('/ClassSubjects/:id', classSubjects);
 router.get('/FreeSubjectList/:id', freeSubjectList);
 router.get("/Subject/:id", getSubjectDetail)
-
 router.delete("/Subject/:id", deleteSubject)
 router.delete("/Subjects/:id", deleteSubjects)
 router.delete("/SubjectsClass/:id", deleteSubjectsByClass)
