@@ -13,6 +13,16 @@ const subjectSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    isLab: {
+        type: Boolean,
+        default: false,
+    },
+    batches: [
+        {
+            batchName: String,
+            students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'student' }]
+        }
+    ],
     sclassName: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'sclass',

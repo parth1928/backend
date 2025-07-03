@@ -8,6 +8,8 @@ const subjectCreate = async (req, res) => {
             subName: subject.subName,
             subCode: subject.subCode,
             sessions: subject.sessions,
+            isLab: subject.isLab || false,
+            batches: subject.batches || [],
         }));
 
         const existingSubjectBySubCode = await Subject.findOne({
