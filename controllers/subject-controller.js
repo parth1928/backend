@@ -27,7 +27,12 @@ const subjectCreate = async (req, res) => {
             }));
 
             const result = await Subject.insertMany(newSubjects);
-            res.send(result);
+            // If only one subject, return it directly for easier frontend handling
+            if (result.length === 1) {
+                res.send(result[0]);
+            } else {
+                res.send(result);
+            }
         }
     } catch (err) {
         console.log(err);
