@@ -36,6 +36,7 @@ const { quickMarkAttendance, submitQuickAttendance } = require('../controllers/q
 const { bulkUploadDtodStudents, deleteDtodStudent, getDtodStudentDetail, getAllDtodStudents } = require('../controllers/dtodStudent-controller');
 
 // Attendance routes
+// Download attendance Excel. Optional query param: ?batch=BatchName
 router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
 
 // Admin

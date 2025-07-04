@@ -5,21 +5,29 @@ const Subject = require('../models/subjectSchema');
 const XLSX = require('xlsx');
 
 const downloadAttendanceExcel = async (req, res) => {
+
     try {
         const { classId, subjectId } = req.params;
+        const { batch: batchName } = req.query;
 
-
-        // Get students and validate class/subject
-        const students = await Student.find({ sclassName: classId })
-            .populate('attendance.subName');
-        const dtodStudents = await DtodStudent.find({ sclassName: classId, school: req.query.adminId })
-            .populate('attendance.subName');
+        // Get all students in class
+        let students = await Student.find({ sclassName: classId }).populate('attendance.subName');
+        let dtodStudents = await DtodStudent.find({ sclassName: classId, school: req.query.adminId }).populate('attendance.subName');
 
         const classInfo = await Sclass.findById(classId);
         const subjectInfo = await Subject.findById(subjectId);
 
         if (!classInfo || !subjectInfo) {
             return res.status(404).json({ message: 'Class or subject not found' });
+        }
+
+        // If batchName is provided and subject is lab, filter students to only those in the batch
+        let batchStudentIds = [];
+        if (batchName && subjectInfo.isLab && Array.isArray(subjectInfo.batches)) {
+            const batch = subjectInfo.batches.find(b => b.batchName === batchName);
+            if (batch) {
+                batchStudentIds = batch.students.map(id => id.toString());
+            }
         }
 
         // Collect all dates for this subject (from both regular and D2D students)
@@ -50,9 +58,15 @@ const downloadAttendanceExcel = async (req, res) => {
 
         // Add regular student rows
         students.forEach(student => {
+            // If batchName is set, only fill attendance for students in batch, others blank
+            if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
+                // Not in batch: leave attendance cells blank
+                const row = [student.rollNum, student.name, ...Array(dates.length).fill(''), ''];
+                data.push(row);
+                return;
+            }
             const row = [student.rollNum, student.name];
             let presentCount = 0;
-
             dates.forEach(date => {
                 const attendance = student.attendance?.find(a => 
                     a.subName && 
@@ -63,7 +77,6 @@ const downloadAttendanceExcel = async (req, res) => {
                 if (status === 'P') presentCount++;
                 row.push(status);
             });
-
             const percentage = dates.length ? ((presentCount / dates.length) * 100).toFixed(2) + '%' : '0%';
             row.push(percentage);
             data.push(row);
@@ -71,9 +84,14 @@ const downloadAttendanceExcel = async (req, res) => {
 
         // Add D2D student rows
         dtodStudents.forEach(student => {
+            if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
+                // Not in batch: leave attendance cells blank
+                const row = [student.rollNum, student.name + ' (D2D)', ...Array(dates.length).fill(''), ''];
+                data.push(row);
+                return;
+            }
             const row = [student.rollNum, student.name + ' (D2D)'];
             let presentCount = 0;
-
             dates.forEach(date => {
                 const attendance = student.attendance?.find(a => 
                     a.subName && 
@@ -84,7 +102,6 @@ const downloadAttendanceExcel = async (req, res) => {
                 if (status === 'P') presentCount++;
                 row.push(status);
             });
-
             const percentage = dates.length ? ((presentCount / dates.length) * 100).toFixed(2) + '%' : '0%';
             row.push(percentage);
             data.push(row);
