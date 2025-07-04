@@ -7,7 +7,7 @@ const XLSX = require('xlsx');
 const downloadAttendanceExcel = async (req, res) => {
     try {
         const { classId, subjectId } = req.params;
-
+        const batchIdx = req.query.batchIdx !== undefined ? parseInt(req.query.batchIdx) : undefined;
 
         // Get students and validate class/subject
         const students = await Student.find({ sclassName: classId })
@@ -48,10 +48,24 @@ const downloadAttendanceExcel = async (req, res) => {
             headers
         ];
 
+        // If lab subject and batchIdx is provided, get allowed student IDs
+        let allowedStudentIds = null;
+        if (subjectInfo.isLab && Array.isArray(subjectInfo.batches) && subjectInfo.batches.length > 0 && batchIdx !== undefined && subjectInfo.batches[batchIdx]) {
+            allowedStudentIds = subjectInfo.batches[batchIdx].students.map(id => id.toString());
+        }
+
         // Add regular student rows
         students.forEach(student => {
             const row = [student.rollNum, student.name];
             let presentCount = 0;
+
+            // If lab and not in allowed batch, mark all blank
+            if (allowedStudentIds && !allowedStudentIds.includes(student._id.toString())) {
+                for (let i = 0; i < dates.length; i++) row.push('');
+                row.push('');
+                data.push(row);
+                return;
+            }
 
             dates.forEach(date => {
                 const attendance = student.attendance?.find(a => 
@@ -73,6 +87,14 @@ const downloadAttendanceExcel = async (req, res) => {
         dtodStudents.forEach(student => {
             const row = [student.rollNum, student.name + ' (D2D)'];
             let presentCount = 0;
+
+            // If lab and not in allowed batch, mark all blank
+            if (allowedStudentIds && !allowedStudentIds.includes(student._id.toString())) {
+                for (let i = 0; i < dates.length; i++) row.push('');
+                row.push('');
+                data.push(row);
+                return;
+            }
 
             dates.forEach(date => {
                 const attendance = student.attendance?.find(a => 
