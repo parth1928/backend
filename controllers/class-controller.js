@@ -63,9 +63,6 @@ const getSclassStudents = async (req, res) => {
     try {
         let students = await Student.find({ sclassName: req.params.id });
         // Only fetch D2D students for this class AND this admin (school)
-        if (req.query.adminId === 'undefined' || !req.query.adminId) {
-            return res.status(400).json({ message: "Missing or invalid adminId" });
-        }
         let dtodStudents = await DtodStudent.find({ sclassName: req.params.id, school: req.query.adminId });
         let modifiedStudents = students.map((student) => ({
             ...student._doc,
