@@ -62,8 +62,10 @@ const getSclassDetail = async (req, res) => {
 const getSclassStudents = async (req, res) => {
     try {
         let students = await Student.find({ sclassName: req.params.id });
-        // Only fetch D2D students for this class AND this admin (school)
-        let dtodStudents = await DtodStudent.find({ sclassName: req.params.id, school: req.query.adminId });
+        let dtodStudents = [];
+        if (req.query.adminId) {
+            dtodStudents = await DtodStudent.find({ sclassName: req.params.id, school: req.query.adminId });
+        }
         let modifiedStudents = students.map((student) => ({
             ...student._doc,
             password: undefined,
