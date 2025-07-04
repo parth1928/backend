@@ -73,9 +73,14 @@ const downloadAttendanceExcel = async (req, res) => {
                     a.subName._id.toString() === subjectId &&
                     new Date(a.date).toISOString().slice(0, 10) === date
                 );
-                const status = attendance?.status === 'Present' ? 'P' : 'A';
-                if (status === 'P') presentCount++;
-                row.push(status);
+                // If batchName is set and student is not in batch, leave blank
+                if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
+                    row.push('');
+                } else {
+                    const status = attendance?.status === 'Present' ? 'P' : (attendance ? 'A' : '');
+                    if (status === 'P') presentCount++;
+                    row.push(status);
+                }
             });
             const percentage = dates.length ? ((presentCount / dates.length) * 100).toFixed(2) + '%' : '0%';
             row.push(percentage);
@@ -98,9 +103,14 @@ const downloadAttendanceExcel = async (req, res) => {
                     a.subName._id.toString() === subjectId &&
                     new Date(a.date).toISOString().slice(0, 10) === date
                 );
-                const status = attendance?.status === 'Present' ? 'P' : 'A';
-                if (status === 'P') presentCount++;
-                row.push(status);
+                // If batchName is set and student is not in batch, leave blank
+                if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
+                    row.push('');
+                } else {
+                    const status = attendance?.status === 'Present' ? 'P' : (attendance ? 'A' : '');
+                    if (status === 'P') presentCount++;
+                    row.push(status);
+                }
             });
             const percentage = dates.length ? ((presentCount / dates.length) * 100).toFixed(2) + '%' : '0%';
             row.push(percentage);
