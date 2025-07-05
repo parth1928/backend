@@ -59,7 +59,12 @@ const getSclassDetail = async (req, res) => {
     }
 }
 
+const mongoose = require('mongoose');
 const getSclassStudents = async (req, res) => {
+    // Defensive: If id is 'undefined' or not a valid ObjectId, return 400
+    if (!req.params.id || req.params.id === 'undefined' || !mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({ message: 'Invalid class id' });
+    }
     try {
         let students = await Student.find({ sclassName: req.params.id });
         let dtodStudents = [];
