@@ -112,24 +112,29 @@ const quickMarkAttendance = async (req, res) => {
 
 const submitQuickAttendance = async (req, res) => {
     try {
-        const { classId, subjectId, date, markedStudents, mode } = req.body;
+        const { classId, subjectId, date, markedStudents, mode, batchName } = req.body;
 
         // Get subject details and all students in the class
         const subject = await Subject.findById(subjectId);
         let allStudents = await Student.find({ sclassName: classId });
-        
-        // If it's a lab subject and batch is specified, filter students
-        if (subject.isLab && req.body.batchName) {
-            const batch = subject.batches.find(b => b.batchName === req.body.batchName);
+
+        // For lab subjects, only process batch students; leave others untouched
+        let studentsToUpdate = allStudents;
+        if (subject.isLab && batchName) {
+            const batch = subject.batches.find(b => b.batchName === batchName);
             if (batch) {
                 const batchStudentIds = batch.students.map(id => id.toString());
-                allStudents = allStudents.filter(student => batchStudentIds.includes(student._id.toString()));
+                studentsToUpdate = allStudents.filter(student => batchStudentIds.includes(student._id.toString()));
+            } else {
+                studentsToUpdate = [];
             }
         }
 
-        // Create attendance records
-        const operations = allStudents.map(student => {
+        // Only update attendance for students in studentsToUpdate
+        const operations = studentsToUpdate.map(student => {
             const isMarked = markedStudents.some(m => m.rollNum === student.rollNum);
+            // For lab: only mark batch students; for non-lab: mark all
+            // For lab, students not in batch are not processed at all
             const status = mode === 'present' ? 
                 (isMarked ? 'Present' : 'Absent') : 
                 (isMarked ? 'Absent' : 'Present');
