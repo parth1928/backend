@@ -1,10 +1,11 @@
 
 const Student = require('../models/studentSchema');
 const DtodStudent = require('../models/dtodStudentSchema');
+const Subject = require('../models/subjectSchema');
 
 const quickMarkAttendance = async (req, res) => {
     try {
-        const { classId, subjectId, date, rollSuffix, mode } = req.body;
+        const { classId, subjectId, date, rollSuffix, mode, batchName } = req.body;
 
         // Input validation
         if (!classId || !subjectId || !date || !rollSuffix || !mode) {
@@ -37,8 +38,20 @@ const quickMarkAttendance = async (req, res) => {
                 return suffix === paddedSuffix;
             });
         } else {
+            // Get subject details to check if it's a lab subject
+            const subject = await Subject.findById(subjectId);
+            
             // Find regular students in the class
-            const students = await Student.find({ sclassName: classId });
+            let students = await Student.find({ sclassName: classId });
+            
+            // If it's a lab subject and batch is specified, filter students
+            if (subject.isLab && batchName) {
+                const batch = subject.batches.find(b => b.batchName === batchName);
+                if (batch) {
+                    const batchStudentIds = batch.students.map(id => id.toString());
+                    students = students.filter(student => batchStudentIds.includes(student._id.toString()));
+                }
+            }
             console.log('Found students in class:', students.map(s => ({ name: s.name, roll: s.rollNum })));
             matchedStudent = students.find(student => {
                 const rollStr = student.rollNum.toString();
@@ -101,8 +114,18 @@ const submitQuickAttendance = async (req, res) => {
     try {
         const { classId, subjectId, date, markedStudents, mode } = req.body;
 
-        // Get all students in the class
-        const allStudents = await Student.find({ sclassName: classId });
+        // Get subject details and all students in the class
+        const subject = await Subject.findById(subjectId);
+        let allStudents = await Student.find({ sclassName: classId });
+        
+        // If it's a lab subject and batch is specified, filter students
+        if (subject.isLab && req.body.batchName) {
+            const batch = subject.batches.find(b => b.batchName === req.body.batchName);
+            if (batch) {
+                const batchStudentIds = batch.students.map(id => id.toString());
+                allStudents = allStudents.filter(student => batchStudentIds.includes(student._id.toString()));
+            }
+        }
 
         // Create attendance records
         const operations = allStudents.map(student => {
