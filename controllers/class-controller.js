@@ -61,6 +61,11 @@ const getSclassDetail = async (req, res) => {
 
 const getSclassStudents = async (req, res) => {
     try {
+        // Validate id parameter
+        if (!req.params.id || req.params.id === 'undefined' || req.params.id === 'null') {
+            return res.status(400).json({ message: "Invalid class ID provided" });
+        }
+
         let students = await Student.find({ sclassName: req.params.id });
         let dtodStudents = [];
         if (req.query.adminId) {
