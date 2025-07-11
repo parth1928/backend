@@ -32,10 +32,10 @@ const subjectSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'admin'
     },
-    teacher: {
+    teachers: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'teacher',
-    }
+        ref: 'teacher'
+    }]
 }, { timestamps: true });
 
 module.exports = mongoose.model("subject", subjectSchema);

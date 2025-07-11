@@ -3,12 +3,12 @@ const Teacher = require('../models/teacherSchema.js');
 const Subject = require('../models/subjectSchema.js');
 
 const teacherRegister = async (req, res) => {
-    const { name, email, password, role, school, teachSubject, teachSclass } = req.body;
+    const { name, email, password, role, school, teachSubjects, teachSclass } = req.body;
     try {
         const salt = await bcrypt.genSalt(10);
         const hashedPass = await bcrypt.hash(password, salt);
 
-        const teacher = new Teacher({ name, email, password: hashedPass, role, school, teachSubject, teachSclass });
+        const teacher = new Teacher({ name, email, password: hashedPass, role, school, teachSubjects, teachSclass });
 
         const existingTeacherByEmail = await Teacher.findOne({ email });
 
@@ -17,7 +17,13 @@ const teacherRegister = async (req, res) => {
         }
         else {
             let result = await teacher.save();
-            await Subject.findByIdAndUpdate(teachSubject, { teacher: teacher._id });
+            // Add this teacher to all assigned subjects
+            if (teachSubjects && teachSubjects.length > 0) {
+                await Subject.updateMany(
+                    { _id: { $in: teachSubjects } },
+                    { $push: { teachers: teacher._id } }
+                );
+            }
             result.password = undefined;
             res.send(result);
         }
@@ -89,19 +95,35 @@ const getTeacherDetail = async (req, res) => {
 }
 
 const updateTeacherSubject = async (req, res) => {
-    const { teacherId, teachSubject } = req.body;
+    const { teacherId, teachSubjects } = req.body;
     try {
+        // First, remove this teacher from all subjects they were previously teaching
+        const teacher = await Teacher.findById(teacherId);
+        if (teacher.teachSubjects && teacher.teachSubjects.length > 0) {
+            await Subject.updateMany(
+                { _id: { $in: teacher.teachSubjects } },
+                { $pull: { teachers: teacherId } }
+            );
+        }
+
+        // Update teacher with new subjects
         const updatedTeacher = await Teacher.findByIdAndUpdate(
             teacherId,
-            { teachSubject },
+            { teachSubjects },
             { new: true }
         );
 
-        await Subject.findByIdAndUpdate(teachSubject, { teacher: updatedTeacher._id });
+        // Add teacher to all new subjects
+        if (teachSubjects && teachSubjects.length > 0) {
+            await Subject.updateMany(
+                { _id: { $in: teachSubjects } },
+                { $push: { teachers: teacherId } }
+            );
+        }
 
         res.send(updatedTeacher);
     } catch (error) {
-        console.log(err);
+        console.log(error);
         res.status(500).json(error);
     }
 };
@@ -110,14 +132,15 @@ const deleteTeacher = async (req, res) => {
     try {
         const deletedTeacher = await Teacher.findByIdAndDelete(req.params.id);
 
-        await Subject.updateOne(
-            { teacher: deletedTeacher._id, teacher: { $exists: true } },
-            { $unset: { teacher: 1 } }
+        // Remove the teacher from all subjects they were teaching
+        await Subject.updateMany(
+            { teachers: deletedTeacher._id },
+            { $pull: { teachers: deletedTeacher._id } }
         );
 
         res.send(deletedTeacher);
     } catch (error) {
-        console.log(err);
+        console.log(error);
         res.status(500).json(error);
     }
 };
