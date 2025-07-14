@@ -56,8 +56,12 @@ router.get('/Coordinator/attendance/:id', getStudentsAttendance);
 router.get('/Coordinator/attendance/download/:id', downloadAttendanceReport);
 // Added for consistency with frontend
 router.get('/coordinator/class/:id', getClassDetails);
-router.get('/coordinator/attendance/:id', getStudentsAttendance);
-router.get('/coordinator/download-attendance/:id', downloadAttendanceReport);
+router.get('/coordinator/students/:classId', getStudents);
+router.get('/coordinator/attendance/:classId', getStudentsAttendance);
+router.get('/coordinator/attendance/analysis/:classId', getStudentsAttendance);
+router.get('/coordinator/attendance/report/:classId', getStudentsAttendance);
+router.get('/coordinator/attendance/download/:classId', downloadAttendanceReport);
+router.get('/coordinator/profile/:id', getCoordinatorDetail);
 
 router.get("/Admin/:id", getAdminDetail)
 // router.delete("/Admin/:id", deleteAdmin)
