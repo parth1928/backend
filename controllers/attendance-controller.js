@@ -143,7 +143,7 @@ const downloadAttendanceExcel = async (req, res) => {
 const downloadCoordinatorReport = async (req, res) => {
     try {
         const { classId } = req.params;
-        const { type, startDate, endDate } = req.query;
+        const { type } = req.query;
 
         // Get all students and subjects for the class
         const students = await Student.find({ sclassName: classId }).populate('attendance.subName');
@@ -151,226 +151,58 @@ const downloadCoordinatorReport = async (req, res) => {
         const subjects = await Subject.find({ sclassName: classId });
         const classInfo = await Sclass.findById(classId);
 
-        // Create workbook and add headers
-        const wb = XLSX.utils.book_new();
-        const headers = ['Roll No', 'Name', 'Type'];
-
-        let data = [];
-        let sheetName = '';
-
-        switch(type) {
-            case 'overall':
-                // Add subject headers
-                subjects.forEach(subject => {
-                    headers.push(subject.subName);
-                });
-                headers.push('Overall %');
-
-                // Add data rows
-                data = [
-                    [`Class: ${classInfo.sclassName}`, `Report Type: Overall Attendance`],
-                    [],  // Empty row for spacing
-                    headers
-                ];
-
-                // Process students
-                [...students, ...dtodStudents].forEach(student => {
-                    const row = [
-                        student.rollNum,
-                        student.name,
-                        student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular'
-                    ];
-
-                    // Add subject-wise attendance
-                    const subjectAttendance = subjects.map(subject => {
-                        const attendance = student.attendance?.filter(a => 
-                            a.subName && a.subName._id.toString() === subject._id.toString()
-                        );
-                        if (!attendance || attendance.length === 0) return '0%';
-                        const present = attendance.filter(a => a.status === 'Present').length;
-                        return `${Math.round((present / attendance.length) * 100)}%`;
-                    });
-
-                    row.push(...subjectAttendance);
-
-                    // Calculate overall percentage
-                    const overallPresent = student.attendance?.filter(a => a.status === 'Present').length || 0;
-                    const overallTotal = student.attendance?.length || 0;
-                    const overallPercentage = overallTotal ? Math.round((overallPresent / overallTotal) * 100) : 0;
-                    row.push(`${overallPercentage}%`);
-
-                    data.push(row);
-                });
-
-                sheetName = 'Overall Attendance';
-                break;
-
-            case 'monthly':
-                // Get all months from attendance records
-                const months = new Set();
-                [...students, ...dtodStudents].forEach(student => {
-                    student.attendance?.forEach(att => {
-                        const month = new Date(att.date).toLocaleString('default', { month: 'long', year: 'numeric' });
-                        months.add(month);
-                    });
-                });
-
-                // Add month headers
-                headers.push(...Array.from(months));
-
-                data = [
-                    [`Class: ${classInfo.sclassName}`, `Report Type: Monthly Attendance`],
-                    [],  // Empty row for spacing
-                    headers
-                ];
-
-                // Process students
-                [...students, ...dtodStudents].forEach(student => {
-                    const row = [
-                        student.rollNum,
-                        student.name,
-                        student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular'
-                    ];
-
-                    // Calculate attendance for each month
-                    Array.from(months).forEach(month => {
-                        const monthAttendance = student.attendance?.filter(att => {
-                            const attMonth = new Date(att.date).toLocaleString('default', { month: 'long', year: 'numeric' });
-                            return attMonth === month;
-                        });
-                        const present = monthAttendance?.filter(a => a.status === 'Present').length || 0;
-                        const total = monthAttendance?.length || 0;
-                        row.push(total ? `${Math.round((present / total) * 100)}%` : 'N/A');
-                    });
-
-                    data.push(row);
-                });
-
-                sheetName = 'Monthly Attendance';
-                break;
-
-            case 'date-range':
-                if (!startDate || !endDate) {
-                    return res.status(400).json({ message: 'Start and end dates are required for date range report' });
-                }
-
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-
-                // Add subject headers for date range
-                subjects.forEach(subject => {
-                    headers.push(subject.subName);
-                });
-                headers.push('Overall %');
-
-                data = [
-                    [`Class: ${classInfo.sclassName}`, `Report Type: Date Range (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`],
-                    [],  // Empty row for spacing
-                    headers
-                ];
-
-                // Process students for date range
-                [...students, ...dtodStudents].forEach(student => {
-                    const row = [
-                        student.rollNum,
-                        student.name,
-                        student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular'
-                    ];
-
-                    // Add subject-wise attendance for date range
-                    const subjectAttendance = subjects.map(subject => {
-                        const attendance = student.attendance?.filter(a => 
-                            a.subName && 
-                            a.subName._id.toString() === subject._id.toString() &&
-                            new Date(a.date) >= start &&
-                            new Date(a.date) <= end
-                        );
-                        if (!attendance || attendance.length === 0) return '0%';
-                        const present = attendance.filter(a => a.status === 'Present').length;
-                        return `${Math.round((present / attendance.length) * 100)}%`;
-                    });
-
-                    row.push(...subjectAttendance);
-
-                    // Calculate overall percentage for date range
-                    const rangeAttendance = student.attendance?.filter(a => 
-                        new Date(a.date) >= start &&
-                        new Date(a.date) <= end
-                    );
-                    const present = rangeAttendance?.filter(a => a.status === 'Present').length || 0;
-                    const total = rangeAttendance?.length || 0;
-                    row.push(total ? `${Math.round((present / total) * 100)}%` : '0%');
-
-                    data.push(row);
-                });
-
-                sheetName = 'Date Range Attendance';
-                break;
-
-            case 'subject-wise':
-                // Add date headers
-                const allDates = new Set();
-                [...students, ...dtodStudents].forEach(student => {
-                    student.attendance?.forEach(att => {
-                        allDates.add(new Date(att.date).toLocaleDateString());
-                    });
-                });
-                headers.push(...Array.from(allDates), 'Overall %');
-
-                subjects.forEach(subject => {
-                    const subjectData = [
-                        [`Class: ${classInfo.sclassName}`, `Subject: ${subject.subName}`],
-                        [],  // Empty row for spacing
-                        headers
-                    ];
-
-                    [...students, ...dtodStudents].forEach(student => {
-                        const row = [
-                            student.rollNum,
-                            student.name,
-                            student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular'
-                        ];
-
-                        // Add attendance for each date
-                        let presentCount = 0;
-                        let totalCount = 0;
-                        Array.from(allDates).forEach(date => {
-                            const attendance = student.attendance?.find(a => 
-                                a.subName && 
-                                a.subName._id.toString() === subject._id.toString() &&
-                                new Date(a.date).toLocaleDateString() === date
-                            );
-                            if (attendance) {
-                                totalCount++;
-                                if (attendance.status === 'Present') presentCount++;
-                                row.push(attendance.status === 'Present' ? 'P' : 'A');
-                            } else {
-                                row.push('-');
-                            }
-                        });
-
-                        // Add overall percentage for this subject
-                        row.push(totalCount ? `${Math.round((presentCount / totalCount) * 100)}%` : '0%');
-                        subjectData.push(row);
-                    });
-
-                    const ws = XLSX.utils.aoa_to_sheet(subjectData);
-                    XLSX.utils.book_append_sheet(wb, ws, subject.subName.slice(0, 31)); // Excel sheet names limited to 31 chars
-                });
-
-                // Send the workbook without creating another sheet
-                const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                res.setHeader('Content-Disposition', `attachment; filename=attendance_report_${classInfo.sclassName}_${new Date().toISOString().slice(0,10)}.xlsx`);
-                return res.send(buffer);
+        if (!classInfo) {
+            return res.status(404).json({ message: 'Class not found' });
         }
 
-        // Create worksheet and add to workbook (for non-subject-wise reports)
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        // Create headers
+        const headers = ['Roll No', 'Name', ...subjects.map(sub => sub.subName), 'Overall %'];
+        const data = [
+            [`Class: ${classInfo.sclassName}`, `Report Type: Subject-wise Attendance`],
+            [],  // Empty row for spacing
+            headers
+        ];
 
-        // Generate and send the file
+        // Process students
+        [...students, ...dtodStudents].forEach(student => {
+            const row = [student.rollNum, student.name];
+
+            // Calculate subject-wise attendance
+            const subjectAttendances = subjects.map(subject => {
+                const subAttendance = student.attendance?.filter(att => 
+                    att.subName && att.subName._id.toString() === subject._id.toString()
+                ) || [];
+                
+                if (subAttendance.length === 0) return '0%';
+                
+                const present = subAttendance.filter(att => att.status === 'Present').length;
+                return `${((present / subAttendance.length) * 100).toFixed(1)}%`;
+            });
+
+            // Calculate overall attendance
+            const allAttendance = student.attendance || [];
+            const overallPresent = allAttendance.filter(att => att.status === 'Present').length;
+            const overallPercentage = allAttendance.length ? 
+                `${((overallPresent / allAttendance.length) * 100).toFixed(1)}%` : 
+                '0%';
+
+            row.push(...subjectAttendances, overallPercentage);
+            data.push(row);
+        });
+
+        // Generate Excel file
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Style the title cells
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: subjects.length + 2 } }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=attendance_report_${classInfo.sclassName}_${new Date().toISOString().slice(0,10)}.xlsx`);
         res.send(buffer);
