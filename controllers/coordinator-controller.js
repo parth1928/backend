@@ -101,49 +101,71 @@ const getClassDetails = async (req, res) => {
 
 const getStudentsAttendance = async (req, res) => {
     try {
-        const coordinator = await Coordinator.findById(req.params.id);
-        const students = await Student.find({ sclassName: coordinator.assignedClass })
-            .populate("attendance.subName", "subName");
-
-        const subjects = await Subject.find({ sclassName: coordinator.assignedClass });
-
-        // Calculate attendance percentage for each student per subject
-        const studentsAttendance = students.map(student => {
-            const subjectWiseAttendance = {};
-            let totalPercentage = 0;
-            let subjectCount = 0;
-
-            subjects.forEach(subject => {
-                const subjectAttendance = student.attendance.filter(
-                    a => a.subName._id.toString() === subject._id.toString()
-                );
-
-                const present = subjectAttendance.filter(a => a.status === "Present").length;
-                const total = subjectAttendance.length;
-                const percentage = total === 0 ? 0 : (present / total) * 100;
-
-                subjectWiseAttendance[subject.subName] = percentage;
-                totalPercentage += percentage;
-                subjectCount++;
+        const { classId } = req.params;
+        
+        // Get all students in the class
+        const students = await Student.find({ sclassName: classId })
+            .populate({
+                path: 'sclassName',
+                select: 'sclassName'
+            })
+            .populate({
+                path: 'school',
+                select: 'schoolName'
             });
 
-            const averagePercentage = subjectCount === 0 ? 0 : totalPercentage / subjectCount;
+        if (!students || students.length === 0) {
+            return res.status(404).json({ message: "No students found in this class" });
+        }
+
+        // Get all subjects for the class
+        const subjects = await Subject.find({ sclassName: classId });
+
+        // Calculate attendance for each student
+        const studentsWithAttendance = await Promise.all(students.map(async (student) => {
+            const subjectWiseAttendance = {};
+            let totalAttendedDays = 0;
+            let totalDays = 0;
+
+            // Calculate attendance for each subject
+            for (const subject of subjects) {
+                const attendance = student.attendance?.filter(a => 
+                    a.subName.toString() === subject._id.toString()
+                ) || [];
+                
+                const attendedDays = attendance.filter(a => a.status === "Present").length;
+                const totalSubjectDays = attendance.length;
+                
+                subjectWiseAttendance[subject.subName] = {
+                    attended: attendedDays,
+                    total: totalSubjectDays,
+                    percentage: totalSubjectDays > 0 ? (attendedDays / totalSubjectDays) * 100 : 0
+                };
+
+                totalAttendedDays += attendedDays;
+                totalDays += totalSubjectDays;
+            }
+
+            // Calculate overall percentage
+            const overallPercentage = totalDays > 0 ? (totalAttendedDays / totalDays) * 100 : 0;
 
             return {
-                enrollmentNo: student.rollNum,
+                _id: student._id,
                 name: student.name,
-                subjectWiseAttendance,
-                totalAttendance: averagePercentage
+                rollNum: student.rollNum,
+                email: student.email,
+                status: student.status || 'active',
+                attendance: {
+                    subjects: subjectWiseAttendance,
+                    overallPercentage: Math.round(overallPercentage * 100) / 100
+                }
             };
-        });
+        }));
 
-        res.send({
-            students: studentsAttendance,
-            subjects: subjects.map(s => s.subName)
-        });
+        res.json(studentsWithAttendance);
     } catch (err) {
-        console.log(err);
-        res.status(500).json(err);
+        console.error('Error getting student attendance:', err);
+        res.status(500).json({ message: "Error fetching attendance data", error: err.message });
     }
 };
 
