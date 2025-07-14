@@ -2,6 +2,8 @@ const router = require('express').Router();
 const multer = require('multer');
 const upload = multer();
 
+const { coordinatorRegister, coordinatorLogin, getClassDetails, getStudentsAttendance, downloadAttendanceReport } = require('../controllers/coordinator-controller.js');
+
 // const { adminRegister, adminLogIn, deleteAdmin, getAdminDetail, updateAdmin } = require('../controllers/admin-controller.js');
 
 const { adminRegister, adminLogIn, getAdminDetail} = require('../controllers/admin-controller.js');
@@ -42,6 +44,17 @@ router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
 // Admin
 router.post('/AdminReg', adminRegister);
 router.post('/AdminLogin', adminLogIn);
+
+// Coordinator
+router.post('/CoordinatorReg', coordinatorRegister);
+router.post('/CoordinatorLogin', coordinatorLogin);
+router.get('/Coordinator/class/:id', getClassDetails);
+router.get('/Coordinator/attendance/:id', getStudentsAttendance);
+router.get('/Coordinator/attendance/download/:id', downloadAttendanceReport);
+// Added for consistency with frontend
+router.get('/coordinator/class/:id', getClassDetails);
+router.get('/coordinator/attendance/:id', getStudentsAttendance);
+router.get('/coordinator/download-attendance/:id', downloadAttendanceReport);
 
 router.get("/Admin/:id", getAdminDetail)
 // router.delete("/Admin/:id", deleteAdmin)
