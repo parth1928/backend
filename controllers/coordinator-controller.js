@@ -190,10 +190,29 @@ const downloadAttendanceReport = async (req, res) => {
     }
 };
 
+const getCoordinatorDetail = async (req, res) => {
+    try {
+        const coordinator = await Coordinator.findById(req.params.id)
+            .populate("school", "schoolName")
+            .populate("assignedClass", "sclassName");
+
+        if (!coordinator) {
+            return res.status(404).send({ message: "Coordinator not found" });
+        }
+
+        coordinator.password = undefined;
+        res.send(coordinator);
+    } catch (err) {
+        console.log(err);
+        res.status(500).json(err);
+    }
+};
+
 module.exports = {
     coordinatorRegister,
     coordinatorLogin,
     getClassDetails,
     getStudentsAttendance,
-    downloadAttendanceReport
+    downloadAttendanceReport,
+    getCoordinatorDetail
 };
