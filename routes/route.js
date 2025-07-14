@@ -36,6 +36,7 @@ const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeac
 const { downloadAttendanceExcel } = require('../controllers/attendance-controller.js');
 const { quickMarkAttendance, submitQuickAttendance } = require('../controllers/quickAttendance-controller.js');
 const { bulkUploadDtodStudents, deleteDtodStudent, getDtodStudentDetail, getAllDtodStudents } = require('../controllers/dtodStudent-controller');
+const { getCoordinatorsList } = require('../controllers/coordinator-list-controller.js');
 
 // Attendance routes
 // Download attendance Excel. Optional query param: ?batch=BatchName
@@ -46,6 +47,8 @@ router.post('/AdminReg', adminRegister);
 router.post('/AdminLogin', adminLogIn);
 
 // Coordinator
+router.post('/ClassCoordinatorCreate', coordinatorRegister); // Add this line
+router.get('/ClassCoordinators/:adminId', getCoordinatorsList);
 router.post('/CoordinatorReg', coordinatorRegister);
 router.post('/CoordinatorLogin', coordinatorLogin);
 router.get('/Coordinator/class/:id', getClassDetails);
