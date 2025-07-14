@@ -2,7 +2,14 @@ const router = require('express').Router();
 const multer = require('multer');
 const upload = multer();
 
-const { coordinatorRegister, coordinatorLogin, getClassDetails, getStudentsAttendance, downloadAttendanceReport } = require('../controllers/coordinator-controller.js');
+const { 
+    coordinatorRegister, 
+    coordinatorLogin, 
+    getClassDetails, 
+    getStudentsAttendance, 
+    downloadAttendanceReport,
+    getCoordinatorDetail 
+} = require('../controllers/coordinator-controller.js');
 
 // const { adminRegister, adminLogIn, deleteAdmin, getAdminDetail, updateAdmin } = require('../controllers/admin-controller.js');
 
