@@ -11,7 +11,6 @@ const express = require("express")
 const cors = require("cors")
 const mongoose = require("mongoose")
 const dotenv = require("dotenv")
-// const bodyParser = require("body-parser")
 const app = express()
 const Routes = require("./routes/route.js")
 
@@ -19,22 +18,28 @@ const PORT = process.env.PORT || 5000
 
 dotenv.config();
 
-// app.use(bodyParser.json({ limit: '10mb', extended: true }))
-// app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }))
-
 app.use(express.json({ limit: '10mb' }))
 
 // CORS Configuration
 app.use(cors({
     origin: [
         'https://bejewelled-sunburst-042cd0.netlify.app',
-        'https://6874d9d3a0180300083869ce--bejewelled-sunburst-042cd0.netlify.app',
-        'http://localhost:3000'
+        'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app',
+        'http://localhost:3000',
+        // Allow any deployment of your Netlify site
+        /^https:\/\/[a-zA-Z0-9-]+--bejewelled-sunburst-042cd0\.netlify\.app$/
     ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Accept', 
+        'Origin', 
+        'X-Requested-With'
+    ],
     credentials: true,
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
+    exposedHeaders: ['Content-Type', 'Authorization']
 }))
 
 mongoose
