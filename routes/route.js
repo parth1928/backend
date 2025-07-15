@@ -48,6 +48,7 @@ const { getCoordinatorsList } = require('../controllers/coordinator-list-control
 // Attendance routes
 // Download attendance Excel. Optional query param: ?batch=BatchName
 router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
+router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);  // Add this new route
 router.get('/class-attendance/:classId', getClassAttendance);
 
 // Admin
