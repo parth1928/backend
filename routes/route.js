@@ -47,9 +47,19 @@ const { getCoordinatorsList } = require('../controllers/coordinator-list-control
 
 // Attendance routes
 // Download attendance Excel. Optional query param: ?batch=BatchName
+// Attendance download routes
 router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
-router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);  // Add this new route
+router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);
 router.get('/class-attendance/:classId', getClassAttendance);
+
+// Add OPTIONS route to handle preflight requests
+router.options('/attendance/coordinator-report/:classId', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+    res.header('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.sendStatus(200);
+});
 
 // Admin
 router.post('/AdminReg', adminRegister);
@@ -62,14 +72,14 @@ router.post('/CoordinatorReg', coordinatorRegister);
 router.post('/CoordinatorLogin', coordinatorLogin);
 router.get('/Coordinator/class/:id', getClassDetails);
 router.get('/Coordinator/attendance/:id', getStudentsAttendance);
-router.get('/Coordinator/attendance/download/:id', downloadAttendanceReport);
+router.get('/Coordinator/attendance/download/:id', downloadCoordinatorReport);
 // Added for consistency with frontend
 router.get('/coordinator/class/:id', getClassDetails);
 router.get('/coordinator/students/:classId', getStudents);
 router.get('/coordinator/attendance/:classId', getStudentsAttendance);
 router.get('/coordinator/attendance/analysis/:classId', getStudentsAttendance);
 router.get('/coordinator/attendance/report/:classId', getStudentsAttendance);
-router.get('/coordinator/attendance/download/:classId', downloadAttendanceReport);
+router.get('/coordinator/attendance/download/:classId', downloadCoordinatorReport);
 router.get('/coordinator/profile/:id', getCoordinatorDetail);
 
 router.get("/Admin/:id", getAdminDetail)

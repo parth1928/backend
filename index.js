@@ -22,7 +22,7 @@ app.use(express.json({ limit: '10mb' }))
 
 // CORS Configuration
 const corsOptions = {
-    origin: ['http://localhost:3000', 'https://bejewelled-sunburst-042cd0.netlify.app', 'https://attendance-frontend.netlify.app'],
+    origin: '*', // Allow all origins for testing
     credentials: false,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: [
@@ -32,10 +32,19 @@ const corsOptions = {
         'Accept',
         'Authorization',
         'Access-Control-Allow-Origin',
-        'Access-Control-Allow-Headers'
+        'Access-Control-Allow-Headers',
+        'Cache-Control',
+        'Pragma',
+        'Expires'
     ],
-    exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization'],
-    optionsSuccessStatus: 200
+    exposedHeaders: [
+        'Content-Length', 
+        'Content-Type', 
+        'Authorization',
+        'Content-Disposition'
+    ],
+    optionsSuccessStatus: 200,
+    preflightContinue: true
 };
 
 // Apply CORS middleware

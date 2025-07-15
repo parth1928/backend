@@ -142,8 +142,20 @@ const downloadAttendanceExcel = async (req, res) => {
 
 const downloadCoordinatorReport = async (req, res) => {
     try {
+        console.log('Download coordinator report request received:', {
+            params: req.params,
+            query: req.query,
+            headers: req.headers
+        });
+        
         const { classId } = req.params;
         const { type } = req.query;
+        
+        // Set CORS headers explicitly
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
+        res.header('Access-Control-Expose-Headers', 'Content-Disposition');
 
         // Get all students and subjects for the class with proper population
         const [students, dtodStudents, subjects, classInfo] = await Promise.all([
