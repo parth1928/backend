@@ -21,26 +21,35 @@ dotenv.config();
 app.use(express.json({ limit: '10mb' }))
 
 // CORS Configuration
-app.use(cors({
-    origin: [
-        'https://bejewelled-sunburst-042cd0.netlify.app',
-        'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app',
-        'http://localhost:3000',
-        // Allow any deployment of your Netlify site
-        /^https:\/\/[a-zA-Z0-9-]+--bejewelled-sunburst-042cd0\.netlify\.app$/
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-        'Content-Type', 
-        'Authorization', 
-        'Accept', 
-        'Origin', 
-        'X-Requested-With'
-    ],
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // List of allowed origins
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'https://bejewelled-sunburst-042cd0.netlify.app',
+            'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app'
+        ];
+
+        // Check if the origin is allowed
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('netlify.app')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
-    optionsSuccessStatus: 200,
-    exposedHeaders: ['Content-Type', 'Authorization']
-}))
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// Pre-flight requests
+app.options('*', cors(corsOptions));
 
 mongoose
     .connect(process.env.MONGO_URL, {
