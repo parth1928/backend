@@ -22,34 +22,36 @@ app.use(express.json({ limit: '10mb' }))
 
 // CORS Configuration
 const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // List of allowed origins
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'https://bejewelled-sunburst-042cd0.netlify.app',
-            'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app'
-        ];
-
-        // Check if the origin is allowed
-        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('netlify.app')) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    origin: ['http://localhost:3000', 'https://bejewelled-sunburst-042cd0.netlify.app', 'https://attendance-frontend.netlify.app'],
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+        'Origin',
+        'X-Requested-With',
+        'Content-Type',
+        'Accept',
+        'Authorization',
+        'Access-Control-Allow-Origin',
+        'Access-Control-Allow-Headers'
+    ],
+    exposedHeaders: ['Content-Length', 'Content-Type', 'Authorization'],
     optionsSuccessStatus: 200
 };
 
+// Apply CORS middleware
 app.use(cors(corsOptions));
 
 // Pre-flight requests
 app.options('*', cors(corsOptions));
+
+// Additional headers middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'false');
+    next();
+});
 
 mongoose
     .connect(process.env.MONGO_URL, {
@@ -60,6 +62,15 @@ mongoose
     .catch((err) => console.log("NOT CONNECTED TO NETWORK", err))
 
 app.use('/', Routes);
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({
+        message: 'Something went wrong!',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
 
 app.listen(PORT, () => {
     console.log(`Server started at port no. ${PORT}`)
