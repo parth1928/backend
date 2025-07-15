@@ -47,19 +47,9 @@ const { getCoordinatorsList } = require('../controllers/coordinator-list-control
 
 // Attendance routes
 // Download attendance Excel. Optional query param: ?batch=BatchName
-// Attendance download routes
 router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
-router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);
+router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);  // Add this new route
 router.get('/class-attendance/:classId', getClassAttendance);
-
-// Add OPTIONS route to handle preflight requests
-router.options('/attendance/coordinator-report/:classId', (req, res) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control');
-    res.header('Access-Control-Expose-Headers', 'Content-Disposition');
-    res.sendStatus(200);
-});
 
 // Admin
 router.post('/AdminReg', adminRegister);
