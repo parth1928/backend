@@ -142,9 +142,21 @@ const downloadAttendanceExcel = async (req, res) => {
 
 const downloadCoordinatorReport = async (req, res) => {
     try {
+        console.log('Starting report generation for classId:', req.params.classId);
         const { classId } = req.params;
         const { type } = req.query;
 
+        // Set CORS headers early
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        if (!classId) {
+            console.error('Missing classId in request');
+            return res.status(400).json({ message: 'Class ID is required' });
+        }
+
+        console.log('Fetching data for class:', classId);
         // Get all students and subjects for the class with proper population
         const [students, dtodStudents, subjects, classInfo] = await Promise.all([
             Student.find({ sclassName: classId }).populate('attendance.subName').lean(),
