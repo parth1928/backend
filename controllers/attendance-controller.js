@@ -4,6 +4,28 @@ const Sclass = require('../models/sclassSchema');
 const Subject = require('../models/subjectSchema');
 const XLSX = require('xlsx');
 
+// Helper function to calculate attendance percentages
+const calculateAttendanceStats = (student, subjects) => {
+    const subjectPercentages = subjects.map(subject => {
+        const subAttendance = student.attendance?.filter(att => 
+            att.subName && att.subName._id.toString() === subject._id.toString()
+        ) || [];
+        
+        if (subAttendance.length === 0) return 0;
+        const present = subAttendance.filter(att => att.status === 'Present').length;
+        return (present / subAttendance.length) * 100;
+    });
+
+    const overallPercentage = subjectPercentages.length > 0
+        ? subjectPercentages.reduce((a, b) => a + b, 0) / subjectPercentages.length
+        : 0;
+
+    return {
+        subjectPercentages,
+        overallPercentage: Math.round(overallPercentage * 10) / 10
+    };
+};
+
 const downloadAttendanceExcel = async (req, res) => {
 
     try {
@@ -143,11 +165,11 @@ const downloadAttendanceExcel = async (req, res) => {
 const downloadCoordinatorReport = async (req, res) => {
     try {
         const { classId } = req.params;
-        const { type } = req.query;
+        const { adminId } = req.query;
 
         // Get all students and subjects for the class
         const students = await Student.find({ sclassName: classId }).populate('attendance.subName');
-        const dtodStudents = await DtodStudent.find({ sclassName: classId }).populate('attendance.subName');
+        const dtodStudents = await DtodStudent.find({ sclassName: classId, school: adminId }).populate('attendance.subName');
         const subjects = await Subject.find({ sclassName: classId });
         const classInfo = await Sclass.findById(classId);
 
@@ -156,37 +178,23 @@ const downloadCoordinatorReport = async (req, res) => {
         }
 
         // Create headers
-        const headers = ['Roll No', 'Name', ...subjects.map(sub => sub.subName), 'Overall %'];
+        const headers = ['Roll No', 'Name', 'Type', ...subjects.map(sub => sub.subName), 'Overall %'];
         const data = [
             [`Class: ${classInfo.sclassName}`, `Report Type: Subject-wise Attendance`],
             [],  // Empty row for spacing
             headers
         ];
 
-        // Process students
+        // Process all students
         [...students, ...dtodStudents].forEach(student => {
-            const row = [student.rollNum, student.name];
-
-            // Calculate subject-wise attendance
-            const subjectAttendances = subjects.map(subject => {
-                const subAttendance = student.attendance?.filter(att => 
-                    att.subName && att.subName._id.toString() === subject._id.toString()
-                ) || [];
-                
-                if (subAttendance.length === 0) return '0%';
-                
-                const present = subAttendance.filter(att => att.status === 'Present').length;
-                return `${((present / subAttendance.length) * 100).toFixed(1)}%`;
-            });
-
-            // Calculate overall attendance
-            const allAttendance = student.attendance || [];
-            const overallPresent = allAttendance.filter(att => att.status === 'Present').length;
-            const overallPercentage = allAttendance.length ? 
-                `${((overallPresent / allAttendance.length) * 100).toFixed(1)}%` : 
-                '0%';
-
-            row.push(...subjectAttendances, overallPercentage);
+            const stats = calculateAttendanceStats(student, subjects);
+            const row = [
+                student.rollNum,
+                student.name,
+                student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular',
+                ...stats.subjectPercentages.map(p => `${p.toFixed(1)}%`),
+                `${stats.overallPercentage}%`
+            ];
             data.push(row);
         });
 
@@ -224,34 +232,19 @@ const getClassAttendance = async (req, res) => {
         // Get all subjects for this class
         const subjects = await Subject.find({ sclassName: classId });
 
-        // Calculate attendance percentages for each student across all subjects
-        const processStudentAttendance = (student) => {
-            const subjectPercentages = subjects.map(subject => {
-                const subjectAttendance = student.attendance?.filter(att => 
-                    att.subName && att.subName._id.toString() === subject._id.toString()
-                );
-                
-                if (!subjectAttendance || subjectAttendance.length === 0) return 0;
-
-                const presentCount = subjectAttendance.filter(att => att.status === 'Present').length;
-                return (presentCount / subjectAttendance.length) * 100;
-            });
-
-            // Calculate overall percentage across all subjects
-            const overallPercentage = subjectPercentages.length > 0
-                ? (subjectPercentages.reduce((a, b) => a + b, 0) / subjectPercentages.length)
-                : 0;
-
+        // Process all students using the helper function
+        const processStudentAttendance = (student, type) => {
+            const stats = calculateAttendanceStats(student, subjects);
             return {
                 _id: student._id,
                 name: student.name,
                 rollNum: student.rollNum,
-                type: student.constructor.modelName === 'DtodStudent' ? 'D2D' : 'Regular',
+                type: type,
                 attendance: {
-                    overallPercentage: Math.round(overallPercentage * 10) / 10,
+                    overallPercentage: stats.overallPercentage,
                     subjectWise: subjects.map((subject, index) => ({
                         subject: subject.subName,
-                        percentage: Math.round(subjectPercentages[index] * 10) / 10
+                        percentage: Math.round(stats.subjectPercentages[index] * 10) / 10
                     }))
                 }
             };
@@ -259,8 +252,8 @@ const getClassAttendance = async (req, res) => {
 
         // Process both regular and D2D students
         const allStudents = [
-            ...students.map(processStudentAttendance),
-            ...dtodStudents.map(processStudentAttendance)
+            ...students.map(s => processStudentAttendance(s, 'Regular')),
+            ...dtodStudents.map(s => processStudentAttendance(s, 'D2D'))
         ];
 
         // Calculate class averages
