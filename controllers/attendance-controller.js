@@ -142,51 +142,30 @@ const downloadAttendanceExcel = async (req, res) => {
 
 const downloadCoordinatorReport = async (req, res) => {
     try {
-        console.log('Starting report generation for classId:', req.params.classId);
         const { classId } = req.params;
         const { type } = req.query;
 
-        // Set CORS headers early
-        res.header('Access-Control-Allow-Origin', '*');
-        res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-        if (!classId) {
-            console.error('Missing classId in request');
-            return res.status(400).json({ message: 'Class ID is required' });
-        }
-
-        console.log('Fetching data for class:', classId);
-        // Get all students and subjects for the class with proper population
-        const [students, dtodStudents, subjects, classInfo] = await Promise.all([
-            Student.find({ sclassName: classId }).populate('attendance.subName').lean(),
-            DtodStudent.find({ sclassName: classId }).populate('attendance.subName').lean(),
-            Subject.find({ sclassName: classId }).lean(),
-            Sclass.findById(classId).lean()
-        ]);
+        // Get all students and subjects for the class
+        const students = await Student.find({ sclassName: classId }).populate('attendance.subName');
+        const dtodStudents = await DtodStudent.find({ sclassName: classId }).populate('attendance.subName');
+        const subjects = await Subject.find({ sclassName: classId });
+        const classInfo = await Sclass.findById(classId);
 
         if (!classInfo) {
             return res.status(404).json({ message: 'Class not found' });
         }
 
-        if (!subjects || subjects.length === 0) {
-            return res.status(404).json({ message: 'No subjects found for this class' });
-        }
-
-        // Create headers with proper formatting
+        // Create headers
         const headers = ['Roll No', 'Name', ...subjects.map(sub => sub.subName), 'Overall %'];
         const data = [
-            [`Class: ${classInfo.sclassName}`, `Report Generated on: ${new Date().toLocaleDateString()}`],
-            [`Total Subjects: ${subjects.length}`, `Total Students: ${students.length + dtodStudents.length}`],
+            [`Class: ${classInfo.sclassName}`, `Report Type: Subject-wise Attendance`],
             [],  // Empty row for spacing
             headers
         ];
 
-        // Process all students (both regular and D2D)
-        const processStudent = (student, isDtod = false) => {
-            const row = [student.rollNum, `${student.name}${isDtod ? ' (D2D)' : ''}`];
-            let totalPresent = 0;
-            let totalClasses = 0;
+        // Process students
+        [...students, ...dtodStudents].forEach(student => {
+            const row = [student.rollNum, student.name];
 
             // Calculate subject-wise attendance
             const subjectAttendances = subjects.map(subject => {
@@ -194,73 +173,43 @@ const downloadCoordinatorReport = async (req, res) => {
                     att.subName && att.subName._id.toString() === subject._id.toString()
                 ) || [];
                 
+                if (subAttendance.length === 0) return '0%';
+                
                 const present = subAttendance.filter(att => att.status === 'Present').length;
-                const total = subAttendance.length;
-                
-                totalPresent += present;
-                totalClasses += total;
-                
-                const percentage = total === 0 ? 0 : (present / total) * 100;
-                return `${percentage.toFixed(1)}%`;
+                return `${((present / subAttendance.length) * 100).toFixed(1)}%`;
             });
 
-            // Calculate and format overall percentage
-            const overallPercentage = totalClasses === 0 ? 0 : (totalPresent / totalClasses) * 100;
-            row.push(...subjectAttendances, `${overallPercentage.toFixed(1)}%`);
-            return row;
-        };
+            // Calculate overall attendance
+            const allAttendance = student.attendance || [];
+            const overallPresent = allAttendance.filter(att => att.status === 'Present').length;
+            const overallPercentage = allAttendance.length ? 
+                `${((overallPresent / allAttendance.length) * 100).toFixed(1)}%` : 
+                '0%';
 
-        // Add all students to data array
-        [...students.map(s => processStudent(s)), ...dtodStudents.map(s => processStudent(s, true))]
-            .sort((a, b) => a[0].localeCompare(b[0])) // Sort by roll number
-            .forEach(row => data.push(row));
+            row.push(...subjectAttendances, overallPercentage);
+            data.push(row);
+        });
 
-        // Add summary row
-        const summaryRow = ['', 'Class Average'];
-        for (let i = 2; i < headers.length; i++) {
-            const column = data.slice(4).map(row => parseFloat(row[i])); // Skip headers and get percentages
-            const average = column.reduce((a, b) => a + b, 0) / column.length;
-            summaryRow.push(`${average.toFixed(1)}%`);
-        }
-        data.push([], summaryRow); // Add empty row before summary
-
-        // Generate Excel file with styling
+        // Generate Excel file
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(data);
         
-        // Enhanced styling
+        // Style the title cells
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: subjects.length + 2 } }, // Title row
-            { s: { r: 1, c: 0 }, e: { r: 1, c: subjects.length + 2 } }  // Info row
-        ];
-
-        // Set column widths
-        ws['!cols'] = [
-            { wch: 12 }, // Roll No
-            { wch: 25 }, // Name
-            ...subjects.map(() => ({ wch: 15 })), // Subject columns
-            { wch: 15 }  // Overall column
+            { s: { r: 0, c: 0 }, e: { r: 0, c: subjects.length + 2 } }
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
 
         const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
-        // Set headers for proper file download
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=attendance_report_${classInfo.sclassName}_${new Date().toISOString().slice(0,10)}.xlsx`);
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-
-        return res.send(buffer);
+        res.send(buffer);
 
     } catch (error) {
         console.error('Report generation error:', error);
-        return res.status(500).json({ 
-            message: 'Failed to generate attendance report',
-            error: error.message || 'Unknown error'
-        });
+        res.status(500).json({ message: 'Failed to generate attendance report' });
     }
 };
 
