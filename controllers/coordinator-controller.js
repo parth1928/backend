@@ -183,8 +183,6 @@ const getStudentsAttendance = async (req, res) => {
     }
 };
 
-const XLSX = require('xlsx');
-
 const downloadAttendanceReport = async (req, res) => {
     try {
         // Get token from header
