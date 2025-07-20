@@ -48,7 +48,6 @@ const { getCoordinatorsList } = require('../controllers/coordinator-list-control
 // Attendance routes
 // Download attendance Excel. Optional query param: ?batch=BatchName
 router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
-router.get('/attendance/coordinator-report/:classId', downloadCoordinatorReport);  // Add this new route
 router.get('/class-attendance/:classId', getClassAttendance);
 
 // Admin
@@ -62,14 +61,14 @@ router.post('/CoordinatorReg', coordinatorRegister);
 router.post('/CoordinatorLogin', coordinatorLogin);
 router.get('/Coordinator/class/:id', getClassDetails);
 router.get('/Coordinator/attendance/:id', getStudentsAttendance);
-router.get('/Coordinator/attendance/download/:id', downloadCoordinatorReport);
+router.get('/Coordinator/attendance/download/:id', downloadAttendanceReport);
 // Added for consistency with frontend
 router.get('/coordinator/class/:id', getClassDetails);
 router.get('/coordinator/students/:classId', getStudents);
 router.get('/coordinator/attendance/:classId', getStudentsAttendance);
 router.get('/coordinator/attendance/analysis/:classId', getStudentsAttendance);
 router.get('/coordinator/attendance/report/:classId', getStudentsAttendance);
-router.get('/coordinator/attendance/download/:classId', downloadCoordinatorReport);
+router.get('/coordinator/attendance/download/:classId', downloadAttendanceReport);
 router.get('/coordinator/profile/:id', getCoordinatorDetail);
 
 router.get("/Admin/:id", getAdminDetail)
