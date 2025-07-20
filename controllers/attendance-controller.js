@@ -70,8 +70,17 @@ const downloadAttendanceExcel = async (req, res) => {
         });
         const dates = Array.from(dateSet).sort();
 
+        // Format date as dd/mm/yyyy
+        const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        };
+
         // Create Excel data
-        const headers = ['Roll No', 'Name', ...dates.map(d => new Date(d).toLocaleDateString()), '% Attendance'];
+        const headers = ['Roll No', 'Name', ...dates.map(d => formatDate(d)), '% Attendance'];
         const data = [
             [`Class: ${classInfo.sclassName}`, `Subject: ${subjectInfo.subName}`],
             [],  // Empty row for spacing
@@ -147,6 +156,17 @@ const downloadAttendanceExcel = async (req, res) => {
         ws['!merges'] = [
             { s: { r: 0, c: 0 }, e: { r: 0, c: dates.length + 2 } }
         ];
+
+        // Format date columns
+        for (let i = 2; i < dates.length + 2; i++) {
+            const col = XLSX.utils.encode_col(i);
+            for (let row = 3; row < data.length; row++) {
+                const cell = col + (row + 1);
+                if (!ws[cell]) continue;
+                if (!ws['!cols']) ws['!cols'] = [];
+                if (!ws['!cols'][i]) ws['!cols'][i] = { wch: 12 }; // Set column width
+            }
+        }
 
         XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
 
