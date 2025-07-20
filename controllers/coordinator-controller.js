@@ -169,24 +169,47 @@ const getStudentsAttendance = async (req, res) => {
     }
 };
 
+const XLSX = require('xlsx');
+
 const downloadAttendanceReport = async (req, res) => {
     try {
         const coordinator = await Coordinator.findById(req.params.id);
+        if (!coordinator || !coordinator.assignedClass) {
+            return res.status(404).json({ message: 'Coordinator or assigned class not found' });
+        }
+
         const students = await Student.find({ sclassName: coordinator.assignedClass })
             .populate("attendance.subName", "subName");
         const subjects = await Subject.find({ sclassName: coordinator.assignedClass });
+        const classInfo = await Sclass.findById(coordinator.assignedClass);
 
-        // Create CSV content
-        let csvContent = "Enrollment No,Name,";
-        subjects.forEach(subject => {
-            csvContent += `${subject.subName},`;
-        });
-        csvContent += "Total Attendance\n";
+        if (!classInfo) {
+            return res.status(404).json({ message: 'Class not found' });
+        }
 
+        // Format date as dd/mm/yyyy
+        const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        };
+
+        // Create headers for Excel
+        const headers = ['Roll No', 'Name', ...subjects.map(sub => sub.subName), 'Overall %'];
+        const data = [
+            [`Class: ${classInfo.sclassName}`, `Report Type: Subject-wise Attendance Report`],
+            [],  // Empty row for spacing
+            headers
+        ];
+
+        // Process student data
         students.forEach(student => {
-            csvContent += `${student.rollNum},${student.name},`;
-            
+            const row = [student.rollNum, student.name];
             let totalPercentage = 0;
+            let validSubjectsCount = 0;
+
             subjects.forEach(subject => {
                 const subjectAttendance = student.attendance.filter(
                     a => a.subName._id.toString() === subject._id.toString()
@@ -195,20 +218,45 @@ const downloadAttendanceReport = async (req, res) => {
                 const total = subjectAttendance.length;
                 const percentage = total === 0 ? 0 : (present / total) * 100;
                 
-                csvContent += `${percentage.toFixed(2)}%,`;
-                totalPercentage += percentage;
+                row.push(`${percentage.toFixed(1)}%`);
+                if (total > 0) {
+                    totalPercentage += percentage;
+                    validSubjectsCount++;
+                }
             });
 
-            const averagePercentage = (totalPercentage / subjects.length).toFixed(2);
-            csvContent += `${averagePercentage}%\n`;
+            const averagePercentage = validSubjectsCount === 0 ? 0 : (totalPercentage / validSubjectsCount);
+            row.push(`${averagePercentage.toFixed(1)}%`);
+            data.push(row);
         });
 
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', 'attachment; filename=attendance_report.csv');
-        res.send(csvContent);
+        // Generate Excel file
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        
+        // Style the title cells
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: subjects.length + 1 } }
+        ];
+
+        // Set column widths
+        ws['!cols'] = [
+            { wch: 12 }, // Roll No
+            { wch: 20 }, // Name
+            ...subjects.map(() => ({ wch: 15 })), // Subject columns
+            { wch: 12 }  // Overall percentage
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Attendance Report');
+        const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=attendance_report_${classInfo.sclassName}_${formatDate(new Date())}.xlsx`);
+        res.send(buffer);
+
     } catch (err) {
-        console.log(err);
-        res.status(500).json(err);
+        console.error('Error generating attendance report:', err);
+        res.status(500).json({ message: 'Failed to generate attendance report' });
     }
 };
 
