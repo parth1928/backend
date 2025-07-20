@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const XLSX = require('xlsx');
 const Coordinator = require('../models/coordinatorSchema.js');
 const Sclass = require('../models/sclassSchema.js');
 const Student = require('../models/studentSchema.js');
