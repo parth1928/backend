@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const XLSX = require('xlsx');
 const Coordinator = require('../models/coordinatorSchema.js');
 const Sclass = require('../models/sclassSchema.js');
@@ -55,8 +56,20 @@ const coordinatorLogin = async (req, res) => {
             if (validated) {
                 coordinator = await coordinator.populate("school", "schoolName");
                 coordinator = await coordinator.populate("assignedClass", "sclassName");
-                coordinator.password = undefined;
-                res.send(coordinator);
+                
+                // Generate JWT token
+                const token = jwt.sign(
+                    { id: coordinator._id, role: coordinator.role },
+                    process.env.JWT_SECRET || 'your-secret-key',
+                    { expiresIn: '1d' }
+                );
+                
+                // Create response object with user data and token
+                const responseData = coordinator.toObject();
+                delete responseData.password;
+                responseData.token = token;
+                
+                res.send(responseData);
             } else {
                 res.send({ message: "Invalid password" });
             }
@@ -64,8 +77,8 @@ const coordinatorLogin = async (req, res) => {
             res.send({ message: "Coordinator not found" });
         }
     } catch (err) {
-        console.log(err);
-        res.status(500).json(err);
+        console.error('Login error:', err);
+        res.status(500).json({ message: 'Login failed', error: err.message });
     }
 };
 
@@ -174,6 +187,20 @@ const XLSX = require('xlsx');
 
 const downloadAttendanceReport = async (req, res) => {
     try {
+        // Get token from header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        } catch (err) {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
+
         const coordinator = await Coordinator.findById(req.params.id);
         if (!coordinator || !coordinator.assignedClass) {
             return res.status(404).json({ message: 'Coordinator or assigned class not found' });
