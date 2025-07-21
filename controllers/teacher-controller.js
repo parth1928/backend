@@ -28,7 +28,7 @@ const teacherRegister = async (req, res) => {
             res.send(result);
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -51,7 +51,7 @@ const teacherLogIn = async (req, res) => {
             res.send({ message: "Teacher not found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -70,7 +70,7 @@ const getTeachers = async (req, res) => {
             res.send({ message: "No teachers found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -89,7 +89,7 @@ const getTeacherDetail = async (req, res) => {
             res.send({ message: "No teacher found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }
@@ -123,7 +123,7 @@ const updateTeacherSubject = async (req, res) => {
 
         res.send(updatedTeacher);
     } catch (error) {
-        console.log(error);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -140,7 +140,7 @@ const deleteTeacher = async (req, res) => {
 
         res.send(deletedTeacher);
     } catch (error) {
-        console.log(error);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -165,7 +165,7 @@ const deleteTeachers = async (req, res) => {
 
         res.send(deletionResult);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -190,7 +190,7 @@ const deleteTeachersByClass = async (req, res) => {
 
         res.send(deletionResult);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -219,7 +219,7 @@ const teacherAttendance = async (req, res) => {
         const result = await teacher.save();
         return res.send(result);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error)
     }
 };

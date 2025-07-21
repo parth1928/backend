@@ -43,7 +43,7 @@ const coordinatorRegister = async (req, res) => {
         result.password = undefined;
         res.send(result);
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -77,7 +77,7 @@ const coordinatorLogin = async (req, res) => {
             res.send({ message: "Coordinator not found" });
         }
     } catch (err) {
-        console.error('Login error:', err);
+    // ...removed for production...
         res.status(500).json({ message: 'Login failed', error: err.message });
     }
 };
@@ -108,7 +108,7 @@ const getClassDetails = async (req, res) => {
             teachers
         });
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -178,7 +178,7 @@ const getStudentsAttendance = async (req, res) => {
 
         res.json(studentsWithAttendance);
     } catch (err) {
-        console.error('Error getting student attendance:', err);
+    // ...removed for production...
         res.status(500).json({ message: "Error fetching attendance data", error: err.message });
     }
 };
@@ -281,7 +281,7 @@ const downloadAttendanceReport = async (req, res) => {
         res.send(buffer);
 
     } catch (err) {
-        console.error('Error generating attendance report:', err);
+    // ...removed for production...
         res.status(500).json({ message: 'Failed to generate attendance report' });
     }
 };
@@ -299,7 +299,7 @@ const getCoordinatorDetail = async (req, res) => {
         coordinator.password = undefined;
         res.send(coordinator);
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };

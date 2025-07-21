@@ -177,7 +177,7 @@ const downloadAttendanceExcel = async (req, res) => {
         res.send(buffer);
 
     } catch (error) {
-        console.error('Excel generation error:', error);
+    // ...removed for production...
         res.status(500).json({ message: 'Failed to generate attendance report' });
     }
 };
@@ -236,7 +236,7 @@ const downloadCoordinatorReport = async (req, res) => {
         res.send(buffer);
 
     } catch (error) {
-        console.error('Report generation error:', error);
+    // ...removed for production...
         res.status(500).json({ message: 'Failed to generate attendance report' });
     }
 };
@@ -292,13 +292,76 @@ const getClassAttendance = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Attendance calculation error:', error);
+    // ...removed for production...
         res.status(500).json({ message: 'Failed to calculate attendance statistics' });
+    }
+};
+
+
+// Bulk attendance marking
+const Student = require('../models/studentSchema');
+const DtodStudent = require('../models/dtodStudentSchema');
+
+/**
+ * Bulk mark attendance for students (regular and D2D)
+ * Expects req.body.attendanceList: [
+ *   { studentId, isDtod, date, status, subName }
+ * ]
+ */
+const bulkMarkAttendance = async (req, res) => {
+    try {
+        const { attendanceList } = req.body;
+        if (!Array.isArray(attendanceList) || attendanceList.length === 0) {
+            return res.status(400).json({ message: 'attendanceList is required and must be non-empty' });
+        }
+
+        // Split into regular and D2D
+        const regularOps = [];
+        const dtodOps = [];
+        for (const record of attendanceList) {
+            const { studentId, isDtod, date, status, subName } = record;
+            if (!studentId || !date || !status || !subName) continue;
+            const update = {
+                $pull: { attendance: { date: new Date(date), subName } }
+            };
+            const push = {
+                $push: { attendance: { date: new Date(date), status, subName } }
+            };
+            if (isDtod) {
+                dtodOps.push(
+                    { updateOne: {
+                        filter: { _id: studentId },
+                        update: [update, push]
+                    }}
+                );
+            } else {
+                regularOps.push(
+                    { updateOne: {
+                        filter: { _id: studentId },
+                        update: [update, push]
+                    }}
+                );
+            }
+        }
+
+        // Bulk write for regular students
+        if (regularOps.length > 0) {
+            await Student.bulkWrite(regularOps);
+        }
+        // Bulk write for D2D students
+        if (dtodOps.length > 0) {
+            await DtodStudent.bulkWrite(dtodOps);
+        }
+
+        res.json({ message: 'Bulk attendance marked successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Bulk attendance marking failed' });
     }
 };
 
 module.exports = {
     downloadAttendanceExcel,
     downloadCoordinatorReport,
-    getClassAttendance
+    getClassAttendance,
+    bulkMarkAttendance
 };

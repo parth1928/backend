@@ -9,7 +9,7 @@ const noticeCreate = async (req, res) => {
         const result = await notice.save()
         res.send(result)
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -23,7 +23,7 @@ const noticeList = async (req, res) => {
             res.send({ message: "No notices found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -35,7 +35,7 @@ const updateNotice = async (req, res) => {
             { new: true })
         res.send(result)
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 }
@@ -45,7 +45,7 @@ const deleteNotice = async (req, res) => {
         const result = await Notice.findByIdAndDelete(req.params.id)
         res.send(result)
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }
@@ -59,7 +59,7 @@ const deleteNotices = async (req, res) => {
             res.send(result)
         }
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }

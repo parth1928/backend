@@ -6,7 +6,7 @@ const getCoordinatorsList = async (req, res) => {
             .populate('assignedClass', 'sclassName');
         res.json(coordinators);
     } catch (error) {
-        console.error(error);
+    // ...removed for production...
         res.status(500).json({ message: "Error fetching coordinators" });
     }
 };

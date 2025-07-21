@@ -24,7 +24,7 @@ const sclassCreate = async (req, res) => {
             res.send(result);
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -38,7 +38,7 @@ const sclassList = async (req, res) => {
             res.send({ message: "No sclasses found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -54,7 +54,7 @@ const getSclassDetail = async (req, res) => {
             res.send({ message: "No class found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }
@@ -87,7 +87,7 @@ const getSclassStudents = async (req, res) => {
             res.send({ message: "No students found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }
@@ -103,7 +103,7 @@ const deleteSclass = async (req, res) => {
         const deletedTeachers = await Teacher.deleteMany({ teachSclass: req.params.id });
         res.send(deletedClass);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 }
@@ -119,7 +119,7 @@ const deleteSclasses = async (req, res) => {
         const deletedTeachers = await Teacher.deleteMany({ school: req.params.id });
         res.send(deletedClasses);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 }

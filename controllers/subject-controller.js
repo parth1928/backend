@@ -30,7 +30,7 @@ const subjectCreate = async (req, res) => {
             res.send(result);
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -45,7 +45,7 @@ const allSubjects = async (req, res) => {
             res.send({ message: "No subjects found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -59,7 +59,7 @@ const classSubjects = async (req, res) => {
             res.send({ message: "No subjects found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -79,7 +79,7 @@ const freeSubjectList = async (req, res) => {
             res.send({ message: "No subjects found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 };
@@ -96,7 +96,7 @@ const getSubjectDetail = async (req, res) => {
             res.send({ message: "No subject found" });
         }
     } catch (err) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(err);
     }
 }
@@ -125,7 +125,7 @@ const deleteSubject = async (req, res) => {
 
         res.send(deletedSubject);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -148,7 +148,7 @@ const deleteSubjects = async (req, res) => {
 
         res.send(deletedSubjects);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
@@ -171,7 +171,7 @@ const deleteSubjectsByClass = async (req, res) => {
 
         res.send(deletedSubjects);
     } catch (error) {
-        console.log(err);
+    // ...removed for production...
         res.status(500).json(error);
     }
 };
