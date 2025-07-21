@@ -340,6 +340,11 @@ const bulkMarkAttendance = async (req, res) => {
             }
         }
 
+        // Debug: log the incoming data and first operation
+        console.log('Received attendanceList:', JSON.stringify(attendanceList, null, 2));
+        if (regularOps.length > 0) console.log('First regularOps:', JSON.stringify(regularOps[0], null, 2));
+        if (dtodOps.length > 0) console.log('First dtodOps:', JSON.stringify(dtodOps[0], null, 2));
+
         // Bulk write for regular students
         if (regularOps.length > 0) {
             await Student.bulkWrite(regularOps);
@@ -351,7 +356,8 @@ const bulkMarkAttendance = async (req, res) => {
 
         res.json({ message: 'Bulk attendance marked successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Bulk attendance marking failed' });
+        console.error('Bulk attendance error:', error);
+        res.status(500).json({ message: 'Bulk attendance marking failed', error: error.message });
     }
 };
 
