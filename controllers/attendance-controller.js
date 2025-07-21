@@ -313,45 +313,55 @@ const bulkMarkAttendance = async (req, res) => {
             return res.status(400).json({ message: 'attendanceList is required and must be non-empty' });
         }
 
-        // Split into regular and D2D
-        const regularOps = [];
-        const dtodOps = [];
+        // Split into regular and D2D, and create separate pull and push ops
+        const regularPullOps = [];
+        const regularPushOps = [];
+        const dtodPullOps = [];
+        const dtodPushOps = [];
         for (const record of attendanceList) {
             const { studentId, isDtod, date, status, subName } = record;
             if (!studentId || !date || !status || !subName) continue;
-            const update = {
-                $pull: { attendance: { date: new Date(date), subName } },
-                $push: { attendance: { date: new Date(date), status, subName } }
+            const pullOp = {
+                updateOne: {
+                    filter: { _id: studentId },
+                    update: { $pull: { attendance: { date: new Date(date), subName } } }
+                }
+            };
+            const pushOp = {
+                updateOne: {
+                    filter: { _id: studentId },
+                    update: { $push: { attendance: { date: new Date(date), status, subName } } }
+                }
             };
             if (isDtod) {
-                dtodOps.push(
-                    { updateOne: {
-                        filter: { _id: studentId },
-                        update
-                    }}
-                );
+                dtodPullOps.push(pullOp);
+                dtodPushOps.push(pushOp);
             } else {
-                regularOps.push(
-                    { updateOne: {
-                        filter: { _id: studentId },
-                        update
-                    }}
-                );
+                regularPullOps.push(pullOp);
+                regularPushOps.push(pushOp);
             }
         }
 
         // Debug: log the incoming data and first operation
         console.log('Received attendanceList:', JSON.stringify(attendanceList, null, 2));
-        if (regularOps.length > 0) console.log('First regularOps:', JSON.stringify(regularOps[0], null, 2));
-        if (dtodOps.length > 0) console.log('First dtodOps:', JSON.stringify(dtodOps[0], null, 2));
+        if (regularPullOps.length > 0) console.log('First regularPullOp:', JSON.stringify(regularPullOps[0], null, 2));
+        if (regularPushOps.length > 0) console.log('First regularPushOp:', JSON.stringify(regularPushOps[0], null, 2));
+        if (dtodPullOps.length > 0) console.log('First dtodPullOp:', JSON.stringify(dtodPullOps[0], null, 2));
+        if (dtodPushOps.length > 0) console.log('First dtodPushOp:', JSON.stringify(dtodPushOps[0], null, 2));
 
         // Bulk write for regular students
-        if (regularOps.length > 0) {
-            await Student.bulkWrite(regularOps);
+        if (regularPullOps.length > 0) {
+            await Student.bulkWrite(regularPullOps);
+        }
+        if (regularPushOps.length > 0) {
+            await Student.bulkWrite(regularPushOps);
         }
         // Bulk write for D2D students
-        if (dtodOps.length > 0) {
-            await DtodStudent.bulkWrite(dtodOps);
+        if (dtodPullOps.length > 0) {
+            await DtodStudent.bulkWrite(dtodPullOps);
+        }
+        if (dtodPushOps.length > 0) {
+            await DtodStudent.bulkWrite(dtodPushOps);
         }
 
         res.json({ message: 'Bulk attendance marked successfully' });
