@@ -298,9 +298,7 @@ const getClassAttendance = async (req, res) => {
 };
 
 
-// Bulk attendance marking
-const Student = require('../models/studentSchema');
-const DtodStudent = require('../models/dtodStudentSchema');
+
 
 /**
  * Bulk mark attendance for students (regular and D2D)
