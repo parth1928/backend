@@ -320,23 +320,21 @@ const bulkMarkAttendance = async (req, res) => {
             const { studentId, isDtod, date, status, subName } = record;
             if (!studentId || !date || !status || !subName) continue;
             const update = {
-                $pull: { attendance: { date: new Date(date), subName } }
-            };
-            const push = {
+                $pull: { attendance: { date: new Date(date), subName } },
                 $push: { attendance: { date: new Date(date), status, subName } }
             };
             if (isDtod) {
                 dtodOps.push(
                     { updateOne: {
                         filter: { _id: studentId },
-                        update: [update, push]
+                        update
                     }}
                 );
             } else {
                 regularOps.push(
                     { updateOne: {
                         filter: { _id: studentId },
-                        update: [update, push]
+                        update
                     }}
                 );
             }
