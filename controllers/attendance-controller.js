@@ -34,7 +34,7 @@ const downloadAttendanceExcel = async (req, res) => {
 
         // Get all students in class
         let students = await Student.find({ sclassName: classId }).populate('attendance.subName');
-        let dtodStudents = await DtodStudent.find({ sclassName: classId, school: req.query.adminId }).populate('attendance.subName');
+        let dtodStudents = await DtodStudent.find({ sclassName: classId }).populate('attendance.subName');
 
         const classInfo = await Sclass.findById(classId);
         const subjectInfo = await Subject.findById(subjectId);
