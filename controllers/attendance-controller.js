@@ -313,21 +313,19 @@ const bulkMarkAttendance = async (req, res) => {
             const pullOp = {
                 updateOne: {
                     filter: { _id: studentId },
-                    update: { $pull: { attendance: { date: new Date(date), subName } } }
+                    update: { $pull: { attendance: { date: new Date(date), subName: subName } } }
                 }
             };
             const pushOp = {
                 updateOne: {
                     filter: { _id: studentId },
-                    update: { $push: { attendance: { date: new Date(date), status, subName } } }
+                    update: { $push: { attendance: { date: new Date(date), status, subName: subName } } }
                 }
             };
             if (isDtod) {
-                dtodPullOps.push(pullOp);
-                dtodPushOps.push(pushOp);
+                await DtodStudent.bulkWrite([pullOp, pushOp]);
             } else {
-                regularPullOps.push(pullOp);
-                regularPushOps.push(pushOp);
+                await Student.bulkWrite([pullOp, pushOp]);
             }
         }
 
@@ -419,25 +417,33 @@ const quickMarkAttendance = async (req, res) => {
         const student = matches[0];
 
         // Remove any existing attendance for this date and subject
-        const Model = student.constructor;
-        await Model.updateOne(
-            { _id: student._id },
-            { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
-        );
-
-        // Add new attendance record
-        await Model.updateOne(
-            { _id: student._id },
-            { 
-                $push: { 
-                    attendance: {
-                        date: new Date(date),
-                        status: mode === 'present' ? 'Present' : 'Absent',
-                        subName: subjectId
-                    }
-                }
-            }
-        );
+        if (student.constructor.modelName === 'DtodStudent') {
+            await DtodStudent.updateOne(
+                { _id: student._id },
+                { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
+            );
+            await DtodStudent.updateOne(
+                { _id: student._id },
+                { $push: { attendance: {
+                    date: new Date(date),
+                    status: mode === 'present' ? 'Present' : 'Absent',
+                    subName: subjectId
+                } } }
+            );
+        } else {
+            await Student.updateOne(
+                { _id: student._id },
+                { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
+            );
+            await Student.updateOne(
+                { _id: student._id },
+                { $push: { attendance: {
+                    date: new Date(date),
+                    status: mode === 'present' ? 'Present' : 'Absent',
+                    subName: subjectId
+                } } }
+            );
+        }
 
         res.json({ 
             success: true, 
