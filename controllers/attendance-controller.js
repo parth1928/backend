@@ -324,9 +324,11 @@ const bulkMarkAttendance = async (req, res) => {
                 }
             };
             if (isDtod) {
-                await DtodStudent.bulkWrite([pullOp, pushOp]);
+                const result = await DtodStudent.bulkWrite([pullOp, pushOp]);
+                console.log('Bulk attendance update for D2D:', studentId, result);
             } else {
-                await Student.bulkWrite([pullOp, pushOp]);
+                const result = await Student.bulkWrite([pullOp, pushOp]);
+                console.log('Bulk attendance update for regular:', studentId, result);
             }
         }
 
@@ -419,11 +421,11 @@ const quickMarkAttendance = async (req, res) => {
 
         // Remove any existing attendance for this date and subject
         if (student.constructor.modelName === 'DtodStudent') {
-            await DtodStudent.updateOne(
+            const pullRes = await DtodStudent.updateOne(
                 { _id: student._id },
                 { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
             );
-            await DtodStudent.updateOne(
+            const pushRes = await DtodStudent.updateOne(
                 { _id: student._id },
                 { $push: { attendance: {
                     date: new Date(date),
@@ -431,12 +433,13 @@ const quickMarkAttendance = async (req, res) => {
                     subName: subjectId
                 } } }
             );
+            console.log('Quick attendance update for D2D:', student._id, { pullRes, pushRes });
         } else {
-            await Student.updateOne(
+            const pullRes = await Student.updateOne(
                 { _id: student._id },
                 { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
             );
-            await Student.updateOne(
+            const pushRes = await Student.updateOne(
                 { _id: student._id },
                 { $push: { attendance: {
                     date: new Date(date),
@@ -444,6 +447,7 @@ const quickMarkAttendance = async (req, res) => {
                     subName: subjectId
                 } } }
             );
+            console.log('Quick attendance update for regular:', student._id, { pullRes, pushRes });
         }
 
         res.json({ 
