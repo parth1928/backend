@@ -123,9 +123,10 @@ const downloadAttendanceExcel = async (req, res) => {
             const row = [student.rollNum, `${student.name} (D2D)`];
             let presentCount = 0;
             dates.forEach(date => {
+                // Find attendance for this subject and date
                 const attendance = student.attendance?.find(a => 
-                    a.subName && 
-                    a.subName._id.toString() === subjectId &&
+                    a.subName &&
+                    (a.subName._id?.toString() === subjectId || a.subName.toString() === subjectId) &&
                     new Date(a.date).toISOString().slice(0, 10) === date
                 );
                 const status = attendance?.status === 'Present' ? 'P' : (attendance ? 'A' : '');
