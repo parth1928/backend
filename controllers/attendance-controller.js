@@ -311,6 +311,12 @@ const bulkMarkAttendance = async (req, res) => {
         for (const record of attendanceList) {
             const { studentId, isDtod, date, status, subName } = record;
             if (!studentId || !date || !status || !subName) continue;
+            // Auto-detect D2D if isDtod is not set
+            let isD2D = isDtod;
+            if (typeof isD2D === 'undefined') {
+                const found = await DtodStudent.findById(studentId);
+                isD2D = !!found;
+            }
             const pullOp = {
                 updateOne: {
                     filter: { _id: studentId },
@@ -323,7 +329,7 @@ const bulkMarkAttendance = async (req, res) => {
                     update: { $push: { attendance: { date: new Date(date), status, subName: subName } } }
                 }
             };
-            if (isDtod) {
+            if (isD2D) {
                 const result = await DtodStudent.bulkWrite([pullOp, pushOp]);
                 console.log('Bulk attendance update for D2D:', studentId, result);
             } else {
