@@ -40,10 +40,17 @@ router.post('/Students/BulkRegister', bulkRegisterStudents);
 const { subjectCreate, classSubjects, deleteSubjectsByClass, getSubjectDetail, deleteSubject, freeSubjectList, allSubjects, deleteSubjects } = require('../controllers/subject-controller.js');
 const { updateSubjectBatches } = require('../controllers/batch-controller.js');
 const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeachers, deleteTeachersByClass, deleteTeacher, updateTeacherSubject, teacherAttendance } = require('../controllers/teacher-controller.js');
-const { downloadAttendanceExcel, getClassAttendance, downloadCoordinatorReport, bulkMarkAttendance } = require('../controllers/attendance-controller.js');
+const { 
+    downloadAttendanceExcel, 
+    getClassAttendance, 
+    downloadCoordinatorReport, 
+    bulkMarkAttendance,
+    quickMarkAttendance,
+    quickSubmitAttendance
+} = require('../controllers/attendance-controller.js');
+
 // Bulk attendance marking
 router.post('/attendance/bulk-mark', bulkMarkAttendance);
-const { quickMarkAttendance, submitQuickAttendance } = require('../controllers/quickAttendance-controller.js');
 const { bulkUploadDtodStudents, deleteDtodStudent, getDtodStudentDetail, getAllDtodStudents } = require('../controllers/dtodStudent-controller');
 const { getCoordinatorsList } = require('../controllers/coordinator-list-controller.js');
 
@@ -165,7 +172,7 @@ router.get('/attendance/download/:classId/:subjectId', downloadAttendanceExcel);
 
 // Quick Attendance routes
 router.post('/attendance/quick-mark', quickMarkAttendance);
-router.post('/attendance/quick-submit', submitQuickAttendance);
+router.post('/attendance/quick-submit', quickSubmitAttendance);
 
 // D2D Students
 

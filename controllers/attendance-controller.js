@@ -120,13 +120,7 @@ const downloadAttendanceExcel = async (req, res) => {
 
         // Add D2D student rows
         dtodStudents.forEach(student => {
-            if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
-                // Not in batch: leave attendance cells blank
-                const row = [student.rollNum, student.name + ' (D2D)', ...Array(dates.length).fill(''), ''];
-                data.push(row);
-                return;
-            }
-            const row = [student.rollNum, student.name + ' (D2D)'];
+            const row = [student.rollNum, `${student.name} (D2D)`];
             let presentCount = 0;
             dates.forEach(date => {
                 const attendance = student.attendance?.find(a => 
@@ -134,14 +128,9 @@ const downloadAttendanceExcel = async (req, res) => {
                     a.subName._id.toString() === subjectId &&
                     new Date(a.date).toISOString().slice(0, 10) === date
                 );
-                // If batchName is set and student is not in batch, leave blank
-                if (batchName && subjectInfo.isLab && batchStudentIds.length > 0 && !batchStudentIds.includes(student._id.toString())) {
-                    row.push('');
-                } else {
-                    const status = attendance?.status === 'Present' ? 'P' : (attendance ? 'A' : '');
-                    if (status === 'P') presentCount++;
-                    row.push(status);
-                }
+                const status = attendance?.status === 'Present' ? 'P' : (attendance ? 'A' : '');
+                if (status === 'P') presentCount++;
+                row.push(status);
             });
             const percentage = dates.length ? ((presentCount / dates.length) * 100).toFixed(2) + '%' : '0%';
             row.push(percentage);
@@ -371,9 +360,168 @@ const bulkMarkAttendance = async (req, res) => {
     }
 };
 
+/**
+ * Quick attendance marking endpoint
+ */
+const quickMarkAttendance = async (req, res) => {
+    try {
+        const { classId, subjectId, rollSuffix, date, mode, preview, students } = req.body;
+
+        // Function to find students by roll suffix
+        const findStudentsByRollSuffix = async () => {
+            let rollNumPattern;
+            if (rollSuffix.toLowerCase().startsWith('d')) {
+                // D2D roll number pattern
+                rollNumPattern = new RegExp(`^${rollSuffix}$`, 'i');
+            } else {
+                // Regular roll number pattern - match ending digits
+                rollNumPattern = new RegExp(`${rollSuffix.padStart(2, '0')}$`);
+            }
+
+            // Query both regular and D2D students
+            const regularStudents = await Student.find({ 
+                sclassName: classId,
+                rollNum: rollNumPattern 
+            });
+
+            const dtodStudents = await DtodStudent.find({ 
+                sclassName: classId,
+                rollNum: rollNumPattern 
+            });
+
+            // If students array is provided (for batch filtering), filter the results
+            let filteredStudents = [...regularStudents, ...dtodStudents];
+            if (students && Array.isArray(students)) {
+                filteredStudents = filteredStudents.filter(student => 
+                    students.includes(student._id.toString())
+                );
+            }
+
+            return filteredStudents;
+        };
+
+        const matches = await findStudentsByRollSuffix();
+
+        if (matches.length === 0) {
+            return res.status(404).json({ message: 'No student found with given roll number' });
+        }
+
+        // If preview mode, just return the matched student(s)
+        if (preview) {
+            return res.json({ 
+                success: true, 
+                student: matches[0],
+                multipleMatches: matches.length > 1 ? matches : null 
+            });
+        }
+
+        // Get the first matching student (frontend should handle multiple matches)
+        const student = matches[0];
+
+        // Remove any existing attendance for this date and subject
+        const Model = student.constructor;
+        await Model.updateOne(
+            { _id: student._id },
+            { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
+        );
+
+        // Add new attendance record
+        await Model.updateOne(
+            { _id: student._id },
+            { 
+                $push: { 
+                    attendance: {
+                        date: new Date(date),
+                        status: mode === 'present' ? 'Present' : 'Absent',
+                        subName: subjectId
+                    }
+                }
+            }
+        );
+
+        res.json({ 
+            success: true, 
+            student: {
+                _id: student._id,
+                name: student.name,
+                rollNum: student.rollNum
+            }
+        });
+
+    } catch (error) {
+        console.error('Quick attendance error:', error);
+        res.status(500).json({ message: 'Quick attendance marking failed', error: error.message });
+    }
+};
+
+const quickSubmitAttendance = async (req, res) => {
+    try {
+        const { classId, subjectId, date, markedStudents, mode } = req.body;
+
+        // Validate input
+        if (!Array.isArray(markedStudents) || markedStudents.length === 0) {
+            return res.status(400).json({ message: 'No students provided for attendance' });
+        }
+
+        // Split students into regular and D2D
+        const regularStudents = markedStudents.filter(s => !s.isDtod);
+        const dtodStudents = markedStudents.filter(s => s.isDtod);
+
+        // Function to process a group of students
+        const processStudents = async (students, Model) => {
+            const operations = students.map(student => ([
+                {
+                    updateOne: {
+                        filter: { _id: student._id },
+                        update: { $pull: { attendance: { date: new Date(date), subName: subjectId } } }
+                    }
+                },
+                {
+                    updateOne: {
+                        filter: { _id: student._id },
+                        update: {
+                            $push: {
+                                attendance: {
+                                    date: new Date(date),
+                                    status: mode === 'present' ? 'Present' : 'Absent',
+                                    subName: subjectId
+                                }
+                            }
+                        }
+                    }
+                }
+            ])).flat();
+
+            if (operations.length > 0) {
+                await Model.bulkWrite(operations);
+            }
+        };
+
+        // Process regular and D2D students in parallel
+        await Promise.all([
+            processStudents(regularStudents, Student),
+            processStudents(dtodStudents, DtodStudent)
+        ]);
+
+        res.json({ 
+            success: true, 
+            message: 'Attendance submitted successfully' 
+        });
+
+    } catch (error) {
+        console.error('Quick submit attendance error:', error);
+        res.status(500).json({ 
+            message: 'Failed to submit attendance', 
+            error: error.message 
+        });
+    }
+};
+
 module.exports = {
     downloadAttendanceExcel,
     downloadCoordinatorReport,
     getClassAttendance,
-    bulkMarkAttendance
+    bulkMarkAttendance,
+    quickMarkAttendance,
+    quickSubmitAttendance
 };

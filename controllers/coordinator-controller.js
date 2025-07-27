@@ -4,6 +4,7 @@ const XLSX = require('xlsx');
 const Coordinator = require('../models/coordinatorSchema.js');
 const Sclass = require('../models/sclassSchema.js');
 const Student = require('../models/studentSchema.js');
+const DtodStudent = require('../models/dtodStudentSchema.js');
 const Subject = require('../models/subjectSchema.js');
 const Teacher = require('../models/teacherSchema.js');
 
@@ -91,8 +92,20 @@ const getClassDetails = async (req, res) => {
             return res.status(404).send({ message: "Coordinator not found" });
         }
 
-        // Get all students in the coordinator's class
-        const students = await Student.find({ sclassName: coordinator.assignedClass });
+        // Get all regular students in the coordinator's class
+        const regularStudents = await Student.find({ sclassName: coordinator.assignedClass });
+        
+        // Get all D2D students in the coordinator's class
+        const dtodStudents = await DtodStudent.find({ 
+            sclassName: coordinator.assignedClass,
+            school: coordinator.school 
+        });
+
+        // Combine regular and D2D students
+        const students = [
+            ...regularStudents.map(s => ({ ...s.toObject(), type: 'Regular' })),
+            ...dtodStudents.map(s => ({ ...s.toObject(), type: 'D2D' }))
+        ];
         
         // Get all subjects in the coordinator's class
         const subjects = await Subject.find({ sclassName: coordinator.assignedClass });
@@ -117,8 +130,8 @@ const getStudentsAttendance = async (req, res) => {
     try {
         const { classId } = req.params;
         
-        // Get all students in the class
-        const students = await Student.find({ sclassName: classId })
+        // Get all regular students in the class
+        const regularStudents = await Student.find({ sclassName: classId })
             .populate({
                 path: 'sclassName',
                 select: 'sclassName'
@@ -127,6 +140,24 @@ const getStudentsAttendance = async (req, res) => {
                 path: 'school',
                 select: 'schoolName'
             });
+
+        // Get all D2D students in the class
+        const dtodStudents = await DtodStudent.find({ 
+            sclassName: classId,
+            school: coordinator.school 
+        }).populate({
+            path: 'sclassName',
+            select: 'sclassName'
+        }).populate({
+            path: 'school',
+            select: 'schoolName'
+        });
+
+        // Combine both types of students
+        const students = [
+            ...regularStudents.map(s => ({ ...s.toObject(), type: 'Regular' })),
+            ...dtodStudents.map(s => ({ ...s.toObject(), type: 'D2D' }))
+        ];
 
         if (!students || students.length === 0) {
             return res.status(404).json({ message: "No students found in this class" });
@@ -204,8 +235,22 @@ const downloadAttendanceReport = async (req, res) => {
             return res.status(404).json({ message: 'Coordinator or assigned class not found' });
         }
 
-        const students = await Student.find({ sclassName: coordinator.assignedClass })
+        // Get regular students
+        const regularStudents = await Student.find({ sclassName: coordinator.assignedClass })
             .populate("attendance.subName", "subName");
+        
+        // Get D2D students
+        const dtodStudents = await DtodStudent.find({ 
+            sclassName: coordinator.assignedClass,
+            school: coordinator.school 
+        }).populate("attendance.subName", "subName");
+
+        // Combine both types of students
+        const students = [
+            ...regularStudents.map(s => ({ ...s.toObject(), type: 'Regular' })),
+            ...dtodStudents.map(s => ({ ...s.toObject(), type: 'D2D' }))
+        ];
+
         const subjects = await Subject.find({ sclassName: coordinator.assignedClass });
         const classInfo = await Sclass.findById(coordinator.assignedClass);
 
