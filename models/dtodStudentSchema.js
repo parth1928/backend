@@ -26,4 +26,7 @@ const dtodStudentSchema = new mongoose.Schema({
     }]
 });
 
+dtodStudentSchema.index({ sclassName: 1 });
+dtodStudentSchema.index({ rollNum: 1 });
+dtodStudentSchema.index({ 'attendance.subName': 1 });
 module.exports = mongoose.model('dtod_students', dtodStudentSchema);

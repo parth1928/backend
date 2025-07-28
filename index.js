@@ -8,6 +8,7 @@ function createJWT(payload) {
 }
 
 const express = require("express")
+const compression = require("compression")
 const cors = require("cors")
 const mongoose = require("mongoose")
 const dotenv = require("dotenv")
@@ -18,6 +19,7 @@ const PORT = process.env.PORT || 5000
 
 dotenv.config();
 
+app.use(compression())
 app.use(express.json({ limit: '10mb' }))
 
 // CORS Configuration

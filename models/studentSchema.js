@@ -57,4 +57,7 @@ const studentSchema = new mongoose.Schema({
     }]
 });
 
+studentSchema.index({ sclassName: 1 });
+studentSchema.index({ rollNum: 1 });
+studentSchema.index({ 'attendance.subName': 1 });
 module.exports = mongoose.model("student", studentSchema);
