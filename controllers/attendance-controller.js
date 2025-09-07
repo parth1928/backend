@@ -388,8 +388,10 @@ const bulkMarkAttendance = async (req, res) => {
             return res.status(400).json({ message: 'attendanceList is required and must be non-empty' });
         }
 
-        // Process each attendance record individually
-        const results = [];
+        // Separate regular and D2D students
+        const regularAttendance = [];
+        const dtodAttendance = [];
+
         for (const record of attendanceList) {
             const { studentId, isDtod, date, status, subName } = record;
             if (!studentId || !date || !status || !subName) {
@@ -397,48 +399,58 @@ const bulkMarkAttendance = async (req, res) => {
                 continue;
             }
 
-            try {
-                // Determine if student is D2D
-                let isD2D = isDtod === true;
-                if (typeof isD2D !== 'boolean') {
-                    const dtodStudent = await DtodStudent.findById(studentId);
-                    isD2D = !!dtodStudent;
-                }
+            const attendanceRecord = {
+                date: new Date(date),
+                status,
+                subName
+            };
 
-                // Get the student to check existing attendance
-                const StudentModel = isD2D ? DtodStudent : Student;
-                const student = await StudentModel.findById(studentId);
-                
-                if (!student) {
-                    results.push({ studentId, success: false, error: 'Student not found' });
-                    continue;
-                }
-                
-                // Check for existing attendance on the same day for this subject
-                const dateStr = new Date(date).toISOString().split('T')[0];
-                const existingEntries = student.attendance.filter(a => 
-                    a.subName.toString() === subName.toString() && 
-                    new Date(a.date).toISOString().split('T')[0] === dateStr
-                );
-                
-                // Add the new attendance record without removing existing ones
-                await StudentModel.updateOne(
-                    { _id: studentId },
-                    { $push: { attendance: { date: new Date(date), status, subName } } }
-                );
-
-                results.push({ studentId, success: true });
-            } catch (err) {
-                console.error(`Error processing student ${studentId}:`, err);
-                results.push({ studentId, success: false, error: err.message });
+            if (isDtod === true) {
+                dtodAttendance.push({ studentId, attendanceRecord });
+            } else {
+                regularAttendance.push({ studentId, attendanceRecord });
             }
         }
 
-        const successCount = results.filter(r => r.success).length;
-        res.json({ 
-            message: `Attendance marked successfully for ${successCount} of ${attendanceList.length} students`,
-            results
+        // Function to process bulk operations for a model
+        const processBulkOperations = async (attendanceData, Model) => {
+            if (attendanceData.length === 0) return [];
+
+            const operations = attendanceData.map(({ studentId, attendanceRecord }) => ({
+                updateOne: {
+                    filter: { _id: studentId },
+                    update: {
+                        $push: { attendance: attendanceRecord }
+                    }
+                }
+            }));
+
+            try {
+                const result = await Model.bulkWrite(operations);
+                return result.modifiedCount;
+            } catch (error) {
+                console.error('Bulk write error:', error);
+                throw error;
+            }
+        };
+
+        // Process both regular and D2D students in parallel
+        const [regularModified, dtodModified] = await Promise.all([
+            processBulkOperations(regularAttendance, Student),
+            processBulkOperations(dtodAttendance, DtodStudent)
+        ]);
+
+        const totalProcessed = regularModified + dtodModified;
+        const totalRequested = attendanceList.length;
+
+        res.json({
+            message: `Attendance marked successfully for ${totalProcessed} of ${totalRequested} students`,
+            processed: totalProcessed,
+            requested: totalRequested,
+            regularStudents: regularModified,
+            dtodStudents: dtodModified
         });
+
     } catch (error) {
         console.error('Bulk attendance error:', error);
         res.status(500).json({ message: 'Bulk attendance marking failed', error: error.message });
