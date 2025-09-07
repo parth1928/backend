@@ -59,16 +59,32 @@ const studentRegister = async (req, res) => {
 };
 
 const studentLogIn = async (req, res) => {
+    console.log('Student login attempt:', { 
+        rollNum: req.body.rollNum, 
+        studentName: req.body.studentName, 
+        hasPassword: !!req.body.password 
+    });
+    
     try {
         let student = await Student.findOne({ rollNum: req.body.rollNum, name: req.body.studentName });
+        console.log('Student found:', !!student);
+        
         if (student) {
             const validated = await bcrypt.compare(req.body.password, student.password);
+            console.log('Password validation:', validated);
+            
             if (validated) {
-                student = await student.populate("school", "schoolName")
-                student = await student.populate("sclassName", "sclassName")
-                student.password = undefined;
-                student.examResult = undefined;
-                student.attendance = undefined;
+                student = await student.populate("school", "schoolName");
+                student = await student.populate("sclassName", "sclassName");
+                
+                student = student.toObject();
+                delete student.password;
+                delete student.examResult;
+                delete student.attendance;
+                
+                // Explicitly set the role
+                student.role = 'Student';
+                
                 res.send(student);
             } else {
                 res.send({ message: "Invalid password" });
@@ -77,8 +93,8 @@ const studentLogIn = async (req, res) => {
             res.send({ message: "Student not found" });
         }
     } catch (err) {
-        console.log(err);
-        res.status(500).json(err);
+        console.error('Student login error:', err);
+        res.status(500).json({ message: "Server error during login", error: err.message });
     }
 };
 

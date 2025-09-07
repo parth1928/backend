@@ -32,6 +32,11 @@ const teacherSchema = new mongoose.Schema({
         ref: 'sclass',
         required: true,
     },
+    // Adding support for multiple classes
+    teachClasses: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'sclass'
+    }],
     attendance: [{
         date: {
             type: Date,

@@ -2,8 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const upload = multer();
 
-const { 
-    coordinatorRegister, 
+const { coordinatorRegister, 
     coordinatorLogin, 
     getClassDetails, 
     getStudentsAttendance, 
@@ -37,20 +36,34 @@ const {
 } = require('../controllers/student_controller.js');
 // Bulk register regular students
 router.post('/Students/BulkRegister', bulkRegisterStudents);
-const { subjectCreate, classSubjects, deleteSubjectsByClass, getSubjectDetail, deleteSubject, freeSubjectList, allSubjects, deleteSubjects } = require('../controllers/subject-controller.js');
+const { subjectCreate, classSubjects, deleteSubjectsByClass, getSubjectDetail, deleteSubject, freeSubjectList, allSubjects, deleteSubjects, teacherSubjects } = require('../controllers/subject-controller.js');
 const { updateSubjectBatches } = require('../controllers/batch-controller.js');
 const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeachers, deleteTeachersByClass, deleteTeacher, updateTeacherSubject, teacherAttendance } = require('../controllers/teacher-controller.js');
+const { updateTeacherClasses } = require('../controllers/teacherClasses-controller.js');
 const { 
     downloadAttendanceExcel, 
     getClassAttendance, 
     downloadCoordinatorReport, 
     bulkMarkAttendance,
     quickMarkAttendance,
-    quickSubmitAttendance
+    quickSubmitAttendance,
+    sendLowAttendanceEmails,
+    getLecturesCount,
+    getSubjectAttendance
 } = require('../controllers/attendance-controller.js');
+// Send low attendance emails
+router.post('/attendance/send-low-attendance-emails', sendLowAttendanceEmails);
 
 // Bulk attendance marking
 router.post('/attendance/bulk-mark', bulkMarkAttendance);
+// Quick attendance marking
+router.post('/attendance/quick-mark', quickMarkAttendance);
+// Quick submit attendance for multiple students
+router.post('/attendance/quick-submit', quickSubmitAttendance);
+// Get lectures count for a subject
+router.get('/attendance/lectures-count/:classId/:subjectId', getLecturesCount);
+// Get attendance percentages for a specific subject
+router.get('/attendance/subject-percentages/:classId/:subjectId', getSubjectAttendance);
 const { bulkUploadDtodStudents, deleteDtodStudent, getDtodStudentDetail, getAllDtodStudents } = require('../controllers/dtodStudent-controller');
 const { getCoordinatorsList } = require('../controllers/coordinator-list-controller.js');
 
@@ -122,6 +135,7 @@ router.delete("/TeachersClass/:id", deleteTeachersByClass)
 router.delete("/Teacher/:id", deleteTeacher)
 
 router.put("/TeacherSubject", updateTeacherSubject)
+router.put("/TeacherClasses", updateTeacherClasses)
 
 router.post('/TeacherAttendance/:id', teacherAttendance)
 
@@ -159,6 +173,7 @@ router.delete("/Sclass/:id", deleteSclass)
 router.post('/SubjectCreate', subjectCreate);
 router.put('/Subject/:subjectId/batches', updateSubjectBatches); // <-- New route for batch assignment
 router.get('/AllSubjects/:id', allSubjects);
+router.get('/TeacherSubjects/:id', teacherSubjects); // New route for teacher subjects
 router.get('/ClassSubjects/:id', classSubjects);
 router.get('/FreeSubjectList/:id', freeSubjectList);
 router.get("/Subject/:id", getSubjectDetail)

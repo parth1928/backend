@@ -86,21 +86,34 @@ const adminRegister = async (req, res) => {
 };
 
 const adminLogIn = async (req, res) => {
-    if (req.body.email && req.body.password) {
-        let admin = await Admin.findOne({ email: req.body.email });
-        if (admin) {
-            const validated = await bcrypt.compare(req.body.password, admin.password);
-            if (validated) {
-                admin.password = undefined;
-                res.send(admin);
+    console.log('Admin login attempt:', { email: req.body.email, hasPassword: !!req.body.password });
+    
+    try {
+        if (req.body.email && req.body.password) {
+            let admin = await Admin.findOne({ email: req.body.email });
+            console.log('Admin found:', !!admin);
+            
+            if (admin) {
+                const validated = await bcrypt.compare(req.body.password, admin.password);
+                console.log('Password validation:', validated);
+                
+                if (validated) {
+                    admin = admin.toObject();
+                    delete admin.password;
+                    admin.role = 'Admin'; // Explicitly set the role
+                    res.send(admin);
+                } else {
+                    res.send({ message: "Invalid password" });
+                }
             } else {
-                res.send({ message: "Invalid password" });
+                res.send({ message: "User not found" });
             }
         } else {
-            res.send({ message: "User not found" });
+            res.send({ message: "Email and password are required" });
         }
-    } else {
-        res.send({ message: "Email and password are required" });
+    } catch (error) {
+        console.error('Admin login error:', error);
+        res.status(500).send({ message: "Server error during login", error: error.message });
     }
 };
 

@@ -50,6 +50,34 @@ const allSubjects = async (req, res) => {
     }
 };
 
+// Get subjects assigned to a specific teacher
+const teacherSubjects = async (req, res) => {
+    try {
+        const teacherId = req.params.id;
+        
+        // Find the teacher to get their assigned subject IDs
+        const teacher = await Teacher.findById(teacherId);
+        
+        if (!teacher || !teacher.teachSubjects || teacher.teachSubjects.length === 0) {
+            return res.send({ message: "No subjects assigned to this teacher" });
+        }
+        
+        // Get the full subject details
+        const subjects = await Subject.find({ 
+            _id: { $in: teacher.teachSubjects } 
+        }).populate("sclassName", "sclassName");
+        
+        if (subjects.length > 0) {
+            res.send(subjects);
+        } else {
+            res.send({ message: "No subjects found" });
+        }
+    } catch (err) {
+        console.error("Error fetching teacher subjects:", err);
+        res.status(500).json(err);
+    }
+};
+
 const classSubjects = async (req, res) => {
     try {
         let subjects = await Subject.find({ sclassName: req.params.id })
@@ -103,30 +131,45 @@ const getSubjectDetail = async (req, res) => {
 
 const deleteSubject = async (req, res) => {
     try {
-        const deletedSubject = await Subject.findByIdAndDelete(req.params.id);
+        const subjectId = req.params.id;
+        console.log('Deleting subject with ID:', subjectId);
+        
+        const deletedSubject = await Subject.findByIdAndDelete(subjectId);
+        
+        if (!deletedSubject) {
+            return res.status(404).json({ message: "Subject not found" });
+        }
+        
+        console.log('Subject found and deleted:', deletedSubject);
 
-        // Set the teachSubject field to null in teachers
-        await Teacher.updateOne(
-            { teachSubject: deletedSubject._id },
-            { $unset: { teachSubject: "" }, $unset: { teachSubject: null } }
+        // Update teachers who have this subject assigned
+        const updateTeacherResult = await Teacher.updateMany(
+            { teachSubjects: subjectId },
+            { $pull: { teachSubjects: subjectId } }
         );
+        
+        console.log('Updated teachers result:', updateTeacherResult);
 
         // Remove the objects containing the deleted subject from students' examResult array
-        await Student.updateMany(
-            {},
-            { $pull: { examResult: { subName: deletedSubject._id } } }
+        const updateStudentExamResult = await Student.updateMany(
+            { 'examResult.subName': subjectId },
+            { $pull: { examResult: { subName: subjectId } } }
         );
+        
+        console.log('Updated student exam results:', updateStudentExamResult);
 
         // Remove the objects containing the deleted subject from students' attendance array
-        await Student.updateMany(
-            {},
-            { $pull: { attendance: { subName: deletedSubject._id } } }
+        const updateStudentAttendance = await Student.updateMany(
+            { 'attendance.subName': subjectId },
+            { $pull: { attendance: { subName: subjectId } } }
         );
+        
+        console.log('Updated student attendance:', updateStudentAttendance);
 
-        res.send(deletedSubject);
+        res.status(200).json(deletedSubject);
     } catch (error) {
-    // ...removed for production...
-        res.status(500).json(error);
+        console.error('Error deleting subject:', error);
+        res.status(500).json({ message: 'Error deleting subject', error: error.message });
     }
 };
 
@@ -177,4 +220,14 @@ const deleteSubjectsByClass = async (req, res) => {
 };
 
 
-module.exports = { subjectCreate, freeSubjectList, classSubjects, getSubjectDetail, deleteSubjectsByClass, deleteSubjects, deleteSubject, allSubjects };
+module.exports = { 
+    subjectCreate, 
+    freeSubjectList, 
+    classSubjects, 
+    getSubjectDetail, 
+    deleteSubjectsByClass, 
+    deleteSubjects, 
+    deleteSubject, 
+    allSubjects,
+    teacherSubjects 
+};

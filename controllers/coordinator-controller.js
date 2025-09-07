@@ -50,10 +50,19 @@ const coordinatorRegister = async (req, res) => {
 };
 
 const coordinatorLogin = async (req, res) => {
+    console.log('Coordinator login attempt:', { 
+        email: req.body.email, 
+        hasPassword: !!req.body.password 
+    });
+    
     try {
         let coordinator = await Coordinator.findOne({ email: req.body.email });
+        console.log('Coordinator found:', !!coordinator);
+        
         if (coordinator) {
             const validated = await bcrypt.compare(req.body.password, coordinator.password);
+            console.log('Password validation:', validated);
+            
             if (validated) {
                 coordinator = await coordinator.populate("school", "schoolName");
                 coordinator = await coordinator.populate("assignedClass", "sclassName");
@@ -69,16 +78,20 @@ const coordinatorLogin = async (req, res) => {
                 const responseData = coordinator.toObject();
                 delete responseData.password;
                 responseData.token = token;
+                responseData.role = 'Coordinator'; // Explicitly set the role
                 
+                console.log('Coordinator login successful');
                 res.send(responseData);
             } else {
+                console.log('Invalid password for coordinator');
                 res.send({ message: "Invalid password" });
             }
         } else {
+            console.log('Coordinator not found');
             res.send({ message: "Coordinator not found" });
         }
     } catch (err) {
-    // ...removed for production...
+        console.error('Coordinator login error:', err);
         res.status(500).json({ message: 'Login failed', error: err.message });
     }
 };

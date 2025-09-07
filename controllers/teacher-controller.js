@@ -34,25 +34,41 @@ const teacherRegister = async (req, res) => {
 };
 
 const teacherLogIn = async (req, res) => {
+    console.log('Teacher login attempt:', { 
+        email: req.body.email, 
+        hasPassword: !!req.body.password 
+    });
+    
     try {
         let teacher = await Teacher.findOne({ email: req.body.email });
+        console.log('Teacher found:', !!teacher);
+        
         if (teacher) {
             const validated = await bcrypt.compare(req.body.password, teacher.password);
+            console.log('Password validation:', validated);
+            
             if (validated) {
-                teacher = await teacher.populate("teachSubjects", "subName sessions")
-                teacher = await teacher.populate("school", "schoolName")
-                teacher = await teacher.populate("teachSclass", "sclassName")
-                teacher.password = undefined;
+                teacher = await teacher.populate("teachSubjects", "subName sessions");
+                teacher = await teacher.populate("school", "schoolName");
+                teacher = await teacher.populate("teachSclass", "sclassName");
+                
+                teacher = teacher.toObject();
+                delete teacher.password;
+                teacher.role = 'Teacher'; // Explicitly set the role
+                
+                console.log('Teacher login successful');
                 res.send(teacher);
             } else {
+                console.log('Invalid password for teacher');
                 res.send({ message: "Invalid password" });
             }
         } else {
+            console.log('Teacher not found');
             res.send({ message: "Teacher not found" });
         }
     } catch (err) {
-    // ...removed for production...
-        res.status(500).json(err);
+        console.error('Teacher login error:', err);
+        res.status(500).json({ message: 'Login failed', error: err.message });
     }
 };
 

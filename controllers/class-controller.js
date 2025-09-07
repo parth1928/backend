@@ -68,9 +68,21 @@ const getSclassStudents = async (req, res) => {
 
         let students = await Student.find({ sclassName: req.params.id });
         let dtodStudents = [];
-        if (req.query.adminId) {
-            dtodStudents = await DtodStudent.find({ sclassName: req.params.id, school: req.query.adminId });
+        
+        // Get adminId from query parameter or from the class itself
+        let adminId = req.query.adminId;
+        if (!adminId) {
+            // If adminId is not provided, get it from the class
+            const classInfo = await Sclass.findById(req.params.id).populate('school');
+            if (classInfo && classInfo.school) {
+                adminId = classInfo.school._id.toString();
+            }
         }
+        
+        if (adminId) {
+            dtodStudents = await DtodStudent.find({ sclassName: req.params.id, school: adminId });
+        }
+        
         let modifiedStudents = students.map((student) => ({
             ...student._doc,
             password: undefined,
@@ -87,7 +99,7 @@ const getSclassStudents = async (req, res) => {
             res.send({ message: "No students found" });
         }
     } catch (err) {
-    // ...removed for production...
+        console.error('Error fetching class students:', err);
         res.status(500).json(err);
     }
 }

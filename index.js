@@ -22,15 +22,24 @@ dotenv.config();
 app.use(compression())
 app.use(express.json({ limit: '10mb' }))
 
+// Request logging middleware for debugging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} | ${req.method} ${req.url} | Origin: ${req.headers.origin || 'No origin'} | Content-Type: ${req.headers['content-type'] || 'No content-type'}`);
+    next();
+});
+
 // CORS Configuration
 const corsOptions = {
     origin: function (origin, callback) {
+        console.log('CORS request from origin:', origin);
+        
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
         
         // List of allowed origins
         const allowedOrigins = [
             'http://localhost:3000',
+            'http://192.168.1.128:3000',  // Allow your local IP
             'https://bejewelled-sunburst-042cd0.netlify.app',
             'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app'
         ];
@@ -39,6 +48,7 @@ const corsOptions = {
         if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('netlify.app')) {
             callback(null, true);
         } else {
+            console.log('Origin not allowed by CORS:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -58,11 +68,18 @@ mongoose
         useNewUrlParser: true,
         useUnifiedTopology: true
     })
-    .then(() => {})
-    .catch(() => {})
+    .then(() => {
+        console.log('Connected to MongoDB successfully');
+    })
+    .catch((err) => {
+        console.error('MongoDB connection error:', err);
+    })
 
 app.use('/', Routes);
 
 app.listen(PORT, () => {
-    // ...removed for production...
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`MongoDB connection: ${process.env.MONGO_URL ? 'Configured' : 'Not configured'}`);
+    console.log(`CORS allowed origins: http://localhost:3000, http://192.168.1.128:3000, and domains ending with netlify.app`);
+    console.log(`Auth routes: /AdminLogin, /StudentLogin, /TeacherLogin, /CoordinatorLogin`);
 })
