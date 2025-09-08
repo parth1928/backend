@@ -305,6 +305,80 @@ const getAllTeacherSubjectAssignments = async (req, res) => {
     }
 };
 
+const migrateTeacherAssignments = async (req, res) => {
+    try {
+        console.log('Starting teacher assignment migration...');
+        
+        // Find all teachers who have teachSubjects but no TeacherSubjectClass records
+        const teachers = await Teacher.find({ 
+            teachSubjects: { $exists: true, $ne: [] },
+            teachSubjects: { $type: 'array', $ne: [] }
+        }).populate('teachSubjects');
+        
+        console.log(`Found ${teachers.length} teachers with teachSubjects`);
+        
+        let migratedCount = 0;
+        let skippedCount = 0;
+        
+        for (const teacher of teachers) {
+            // Check if this teacher already has assignments in the new system
+            const existingAssignments = await TeacherSubjectClass.find({ teacher: teacher._id });
+            
+            if (existingAssignments.length > 0) {
+                console.log(`Teacher ${teacher.name} already has ${existingAssignments.length} assignments, skipping`);
+                skippedCount++;
+                continue;
+            }
+            
+            // Create assignments for each subject
+            for (const subject of teacher.teachSubjects) {
+                // Skip if subject is not populated
+                if (!subject || !subject._id) {
+                    console.log(`Skipping invalid subject for teacher ${teacher.name}`);
+                    continue;
+                }
+                
+                // Check if assignment already exists (double check)
+                const existingAssignment = await TeacherSubjectClass.findOne({
+                    teacher: teacher._id,
+                    subject: subject._id,
+                    sclass: subject.sclassName
+                });
+                
+                if (existingAssignment) {
+                    console.log(`Assignment already exists for teacher ${teacher.name}, subject ${subject.subName}`);
+                    continue;
+                }
+                
+                // Create new assignment
+                const teacherSubjectClass = new TeacherSubjectClass({
+                    teacher: teacher._id,
+                    subject: subject._id,
+                    sclass: subject.sclassName,
+                    batch: subject.isLab ? null : null, // For now, no batch assignment during migration
+                    school: teacher.school
+                });
+                
+                await teacherSubjectClass.save();
+                console.log(`Created assignment for teacher ${teacher.name}, subject ${subject.subName}`);
+            }
+            
+            migratedCount++;
+        }
+        
+        res.json({
+            message: 'Migration completed',
+            migratedTeachers: migratedCount,
+            skippedTeachers: skippedCount,
+            totalTeachers: teachers.length
+        });
+        
+    } catch (error) {
+        console.error('Error migrating teacher assignments:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     teacherRegister,
     teacherLogIn,
@@ -313,6 +387,7 @@ module.exports = {
     updateTeacherSubject,
     getTeacherSubjectAssignments,
     getAllTeacherSubjectAssignments,
+    migrateTeacherAssignments,
     deleteTeacher,
     deleteTeachers,
     deleteTeachersByClass
