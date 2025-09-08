@@ -53,11 +53,6 @@ const studentSchema = new mongoose.Schema({
             type: mongoose.Schema.Types.ObjectId,
             ref: 'subject',
             required: true
-        },
-        teacher: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'teacher',
-            required: true
         }
     }]
 });

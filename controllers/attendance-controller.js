@@ -383,12 +383,9 @@ const getClassAttendance = async (req, res) => {
  */
 const bulkMarkAttendance = async (req, res) => {
     try {
-        const { attendanceList, teacherId } = req.body;
+        const { attendanceList } = req.body;
         if (!Array.isArray(attendanceList) || attendanceList.length === 0) {
             return res.status(400).json({ message: 'attendanceList is required and must be non-empty' });
-        }
-        if (!teacherId) {
-            return res.status(400).json({ message: 'teacherId is required' });
         }
 
         // Separate regular and D2D students
@@ -405,8 +402,7 @@ const bulkMarkAttendance = async (req, res) => {
             const attendanceRecord = {
                 date: new Date(date),
                 status,
-                subName,
-                teacher: teacherId
+                subName
             };
 
             if (isDtod === true) {
@@ -559,14 +555,11 @@ const quickMarkAttendance = async (req, res) => {
 
 const quickSubmitAttendance = async (req, res) => {
     try {
-        const { classId, subjectId, date, markedStudents, mode, teacherId } = req.body;
+        const { classId, subjectId, date, markedStudents, mode } = req.body;
 
         // Validate input
         if (!Array.isArray(markedStudents) || markedStudents.length === 0) {
             return res.status(400).json({ message: 'No students provided for attendance' });
-        }
-        if (!teacherId) {
-            return res.status(400).json({ message: 'teacherId is required' });
         }
 
         // Split students into regular and D2D
@@ -583,8 +576,7 @@ const quickSubmitAttendance = async (req, res) => {
                             attendance: {
                                 date: new Date(date),
                                 status: mode === 'present' ? 'Present' : 'Absent',
-                                subName: subjectId,
-                                teacher: teacherId
+                                subName: subjectId
                             }
                         }
                     }
@@ -602,16 +594,16 @@ const quickSubmitAttendance = async (req, res) => {
             processStudents(dtodStudents, DtodStudent)
         ]);
 
-        res.json({
-            success: true,
-            message: 'Attendance submitted successfully'
+        res.json({ 
+            success: true, 
+            message: 'Attendance submitted successfully' 
         });
 
     } catch (error) {
         console.error('Quick submit attendance error:', error);
-        res.status(500).json({
-            message: 'Failed to submit attendance',
-            error: error.message
+        res.status(500).json({ 
+            message: 'Failed to submit attendance', 
+            error: error.message 
         });
     }
 };
@@ -752,7 +744,7 @@ const getLecturesCount = async (req, res) => {
 const getSubjectAttendance = async (req, res) => {
     try {
         const { classId, subjectId } = req.params;
-        const { batch, teacherId } = req.query; // Get batch and teacherId from query parameters
+        const { batch } = req.query; // Get batch from query parameters
 
         // Validate parameters
         if (!classId || !subjectId) {
@@ -800,17 +792,16 @@ const getSubjectAttendance = async (req, res) => {
 
         // Calculate attendance percentage for each student for this subject
         const calculateSubjectPercentage = (student) => {
-            // Filter attendance records for this subject and optionally by teacher
-            const subjectAttendance = student.attendance?.filter(att => {
-                const matchesSubject = att.subName && att.subName.toString() === subjectId;
-                const matchesTeacher = !teacherId || (att.teacher && att.teacher.toString() === teacherId);
-                return matchesSubject && matchesTeacher;
-            }) || [];
+            const subAttendance = student.attendance?.filter(att =>
+                att.subName && att.subName.toString() === subjectId
+            ) || [];
 
-            if (subjectAttendance.length === 0) return 0;
-            const present = subjectAttendance.filter(att => att.status === 'Present').length;
-            return Math.round((present / subjectAttendance.length) * 100 * 10) / 10;
-        };        // Process both regular and D2D students
+            if (subAttendance.length === 0) return 0;
+            const present = subAttendance.filter(att => att.status === 'Present').length;
+            return Math.round((present / subAttendance.length) * 100 * 10) / 10;
+        };
+
+        // Process both regular and D2D students
         const result = [
             ...filteredStudents.filter(s => !filteredDtodStudents.some(d => d._id.toString() === s._id.toString())).map(student => ({
                 _id: student._id,
@@ -831,7 +822,6 @@ const getSubjectAttendance = async (req, res) => {
         res.json({
             subject: subject.subName,
             batch: batch || null,
-            teacherId: teacherId || null,
             isLab: subject.isLab,
             students: result
         });

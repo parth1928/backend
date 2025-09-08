@@ -1,8 +1,6 @@
 const bcrypt = require('bcrypt');
 const Teacher = require('../models/teacherSchema.js');
 const Subject = require('../models/subjectSchema.js');
-const Sclass = require('../models/sclassSchema.js');
-const TeacherSubjectClass = require('../models/teacherSubjectClassSchema.js');
 
 const teacherRegister = async (req, res) => {
     const { name, email, password, role, school, teachSubjects, teachSclass } = req.body;
@@ -113,76 +111,36 @@ const getTeacherDetail = async (req, res) => {
 }
 
 const updateTeacherSubject = async (req, res) => {
-    const { teacherId, subjectAssignments } = req.body;
-
+    const { teacherId, teachSubjects } = req.body;
     try {
+        // First, remove this teacher from all subjects they were previously teaching
         const teacher = await Teacher.findById(teacherId);
-        if (!teacher) {
-            return res.status(404).json({ message: 'Teacher not found' });
+        if (teacher.teachSubjects && teacher.teachSubjects.length > 0) {
+            await Subject.updateMany(
+                { _id: { $in: teacher.teachSubjects } },
+                { $pull: { teachers: teacherId } }
+            );
         }
 
-        // Remove existing TeacherSubjectClass records for this teacher
-        await TeacherSubjectClass.deleteMany({ teacher: teacherId });
+        // Update teacher with new subjects
+        const updatedTeacher = await Teacher.findByIdAndUpdate(
+            teacherId,
+            { teachSubjects },
+            { new: true }
+        );
 
-        // Create new TeacherSubjectClass records
-        const newAssignments = [];
-
-        for (const assignment of subjectAssignments) {
-            const { subjectId, classId, batch } = assignment;
-
-            // Validate subject exists
-            const subject = await Subject.findById(subjectId);
-            if (!subject) {
-                return res.status(404).json({ message: `Subject ${subjectId} not found` });
-            }
-
-            // Validate class exists
-            const sclass = await Sclass.findById(classId);
-            if (!sclass) {
-                return res.status(404).json({ message: `Class ${classId} not found` });
-            }
-
-            // For lab subjects, validate batch exists
-            if (subject.isLab && batch) {
-                const batchExists = subject.batches.some(b => b.batchName === batch);
-                if (!batchExists) {
-                    return res.status(400).json({
-                        message: `Batch ${batch} not found for subject ${subject.subName}`
-                    });
-                }
-            }
-
-            // Create TeacherSubjectClass record
-            const teacherSubjectClass = new TeacherSubjectClass({
-                teacher: teacherId,
-                subject: subjectId,
-                sclass: classId,
-                batch: subject.isLab ? batch : null,
-                school: teacher.school
-            });
-
-            await teacherSubjectClass.save();
-            newAssignments.push(teacherSubjectClass);
+        // Add teacher to all new subjects
+        if (teachSubjects && teachSubjects.length > 0) {
+            await Subject.updateMany(
+                { _id: { $in: teachSubjects } },
+                { $push: { teachers: teacherId } }
+            );
         }
 
-        // Update teacher's teachSubjects array (for backward compatibility)
-        const subjectIds = subjectAssignments.map(a => a.subjectId);
-        await Teacher.findByIdAndUpdate(teacherId, { teachSubjects: subjectIds });
-
-        res.json({
-            message: 'Teacher subject assignments updated successfully',
-            assignments: newAssignments
-        });
-
+        res.send(updatedTeacher);
     } catch (error) {
-        console.error('Error updating teacher subjects:', error);
-        if (error.code === 11000) {
-            res.status(400).json({
-                message: 'This teacher is already assigned to the same subject-class combination. Please check your selections.'
-            });
-        } else {
-            res.status(500).json({ message: error.message });
-        }
+    // ...removed for production...
+        res.status(500).json(error);
     }
 };
 
@@ -253,129 +211,32 @@ const deleteTeachersByClass = async (req, res) => {
     }
 };
 
-const getTeacherSubjectAssignments = async (req, res) => {
+const teacherAttendance = async (req, res) => {
+    const { status, date } = req.body;
+
     try {
-        const { teacherId } = req.params;
+        const teacher = await Teacher.findById(req.params.id);
 
-        const assignments = await TeacherSubjectClass.find({ teacher: teacherId })
-            .populate('subject', 'subName subCode sessions isLab batches')
-            .populate('sclass', 'sclassName')
-            .populate('teacher', 'name email');
-
-        res.json({
-            assignments: assignments.map(assignment => ({
-                _id: assignment._id,
-                subject: assignment.subject,
-                sclass: assignment.sclass,
-                batch: assignment.batch,
-                schedule: assignment.schedule,
-                isActive: assignment.isActive
-            }))
-        });
-
-    } catch (error) {
-        console.error('Error getting teacher subject assignments:', error);
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const getAllTeacherSubjectAssignments = async (req, res) => {
-    try {
-        const assignments = await TeacherSubjectClass.find({})
-            .populate('subject', 'subName subCode sessions isLab batches')
-            .populate('sclass', 'sclassName')
-            .populate('teacher', 'name email')
-            .sort({ 'subject.subName': 1, 'teacher.name': 1 });
-
-        res.json({
-            assignments: assignments.map(assignment => ({
-                _id: assignment._id,
-                subject: assignment.subject,
-                sclass: assignment.sclass,
-                teacher: assignment.teacher,
-                batch: assignment.batch,
-                schedule: assignment.schedule,
-                isActive: assignment.isActive
-            }))
-        });
-
-    } catch (error) {
-        console.error('Error getting all teacher subject assignments:', error);
-        res.status(500).json({ message: error.message });
-    }
-};
-
-const migrateTeacherAssignments = async (req, res) => {
-    try {
-        console.log('Starting teacher assignment migration...');
-        
-        // Find all teachers who have teachSubjects but no TeacherSubjectClass records
-        const teachers = await Teacher.find({ 
-            teachSubjects: { $exists: true, $ne: [] },
-            teachSubjects: { $type: 'array', $ne: [] }
-        }).populate('teachSubjects');
-        
-        console.log(`Found ${teachers.length} teachers with teachSubjects`);
-        
-        let migratedCount = 0;
-        let skippedCount = 0;
-        
-        for (const teacher of teachers) {
-            // Check if this teacher already has assignments in the new system
-            const existingAssignments = await TeacherSubjectClass.find({ teacher: teacher._id });
-            
-            if (existingAssignments.length > 0) {
-                console.log(`Teacher ${teacher.name} already has ${existingAssignments.length} assignments, skipping`);
-                skippedCount++;
-                continue;
-            }
-            
-            // Create assignments for each subject
-            for (const subject of teacher.teachSubjects) {
-                // Skip if subject is not populated
-                if (!subject || !subject._id) {
-                    console.log(`Skipping invalid subject for teacher ${teacher.name}`);
-                    continue;
-                }
-                
-                // Check if assignment already exists (double check)
-                const existingAssignment = await TeacherSubjectClass.findOne({
-                    teacher: teacher._id,
-                    subject: subject._id,
-                    sclass: subject.sclassName
-                });
-                
-                if (existingAssignment) {
-                    console.log(`Assignment already exists for teacher ${teacher.name}, subject ${subject.subName}`);
-                    continue;
-                }
-                
-                // Create new assignment
-                const teacherSubjectClass = new TeacherSubjectClass({
-                    teacher: teacher._id,
-                    subject: subject._id,
-                    sclass: subject.sclassName,
-                    batch: subject.isLab ? null : null, // For now, no batch assignment during migration
-                    school: teacher.school
-                });
-                
-                await teacherSubjectClass.save();
-                console.log(`Created assignment for teacher ${teacher.name}, subject ${subject.subName}`);
-            }
-            
-            migratedCount++;
+        if (!teacher) {
+            return res.send({ message: 'Teacher not found' });
         }
-        
-        res.json({
-            message: 'Migration completed',
-            migratedTeachers: migratedCount,
-            skippedTeachers: skippedCount,
-            totalTeachers: teachers.length
-        });
-        
+
+        const existingAttendance = teacher.attendance.find(
+            (a) =>
+                a.date.toDateString() === new Date(date).toDateString()
+        );
+
+        if (existingAttendance) {
+            existingAttendance.status = status;
+        } else {
+            teacher.attendance.push({ date, status });
+        }
+
+        const result = await teacher.save();
+        return res.send(result);
     } catch (error) {
-        console.error('Error migrating teacher assignments:', error);
-        res.status(500).json({ message: error.message });
+    // ...removed for production...
+        res.status(500).json(error)
     }
 };
 
@@ -385,10 +246,8 @@ module.exports = {
     getTeachers,
     getTeacherDetail,
     updateTeacherSubject,
-    getTeacherSubjectAssignments,
-    getAllTeacherSubjectAssignments,
-    migrateTeacherAssignments,
     deleteTeacher,
     deleteTeachers,
-    deleteTeachersByClass
+    deleteTeachersByClass,
+    teacherAttendance
 };
