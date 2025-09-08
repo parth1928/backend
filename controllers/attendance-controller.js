@@ -744,6 +744,7 @@ const getLecturesCount = async (req, res) => {
 const getSubjectAttendance = async (req, res) => {
     try {
         const { classId, subjectId } = req.params;
+        const { batch } = req.query; // Get batch from query parameters
 
         // Validate parameters
         if (!classId || !subjectId) {
@@ -759,12 +760,42 @@ const getSubjectAttendance = async (req, res) => {
             return res.status(404).json({ message: 'Subject not found' });
         }
 
+        // If this is a lab subject and a batch is specified, filter students
+        let filteredStudents = [...students, ...dtodStudents];
+        let filteredDtodStudents = [...dtodStudents];
+
+        if (subject.isLab && batch) {
+            // Find the specified batch in the subject
+            const selectedBatch = subject.batches.find(b => b.batchName === batch);
+            if (selectedBatch) {
+                // Get student IDs in the batch
+                const batchStudentIds = selectedBatch.students.map(id => id.toString());
+
+                // Filter regular students
+                const regularStudentsInBatch = students.filter(student =>
+                    batchStudentIds.includes(student._id.toString())
+                );
+
+                // Filter D2D students
+                const dtodStudentsInBatch = dtodStudents.filter(student =>
+                    batchStudentIds.includes(student._id.toString())
+                );
+
+                filteredStudents = [...regularStudentsInBatch, ...dtodStudentsInBatch];
+                filteredDtodStudents = dtodStudentsInBatch;
+            } else {
+                // If batch not found, return empty results
+                filteredStudents = [];
+                filteredDtodStudents = [];
+            }
+        }
+
         // Calculate attendance percentage for each student for this subject
         const calculateSubjectPercentage = (student) => {
-            const subAttendance = student.attendance?.filter(att => 
+            const subAttendance = student.attendance?.filter(att =>
                 att.subName && att.subName.toString() === subjectId
             ) || [];
-            
+
             if (subAttendance.length === 0) return 0;
             const present = subAttendance.filter(att => att.status === 'Present').length;
             return Math.round((present / subAttendance.length) * 100 * 10) / 10;
@@ -772,14 +803,14 @@ const getSubjectAttendance = async (req, res) => {
 
         // Process both regular and D2D students
         const result = [
-            ...students.map(student => ({
+            ...filteredStudents.filter(s => !filteredDtodStudents.some(d => d._id.toString() === s._id.toString())).map(student => ({
                 _id: student._id,
                 name: student.name,
                 rollNum: student.rollNum,
                 type: 'Regular',
                 percentage: calculateSubjectPercentage(student)
             })),
-            ...dtodStudents.map(student => ({
+            ...filteredDtodStudents.map(student => ({
                 _id: student._id,
                 name: student.name,
                 rollNum: student.rollNum,
@@ -790,6 +821,8 @@ const getSubjectAttendance = async (req, res) => {
 
         res.json({
             subject: subject.subName,
+            batch: batch || null,
+            isLab: subject.isLab,
             students: result
         });
 
