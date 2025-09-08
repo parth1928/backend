@@ -315,6 +315,5 @@ module.exports = {
     getAllTeacherSubjectAssignments,
     deleteTeacher,
     deleteTeachers,
-    deleteTeachersByClass,
-    teacherAttendance
+    deleteTeachersByClass
 };

@@ -38,7 +38,7 @@ const {
 router.post('/Students/BulkRegister', bulkRegisterStudents);
 const { subjectCreate, classSubjects, deleteSubjectsByClass, getSubjectDetail, deleteSubject, freeSubjectList, allSubjects, deleteSubjects, teacherSubjects } = require('../controllers/subject-controller.js');
 const { updateSubjectBatches } = require('../controllers/batch-controller.js');
-const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeachers, deleteTeachersByClass, deleteTeacher, updateTeacherSubject, getTeacherSubjectAssignments, getAllTeacherSubjectAssignments, teacherAttendance } = require('../controllers/teacher-controller.js');
+const { teacherRegister, teacherLogIn, getTeachers, getTeacherDetail, deleteTeachers, deleteTeachersByClass, deleteTeacher, updateTeacherSubject, getTeacherSubjectAssignments, getAllTeacherSubjectAssignments } = require('../controllers/teacher-controller.js');
 const { updateTeacherClasses } = require('../controllers/teacherClasses-controller.js');
 const { 
     downloadAttendanceExcel, 
@@ -138,8 +138,6 @@ router.put("/TeacherSubject", updateTeacherSubject)
 router.get("/TeacherSubjectAssignments/:teacherId", getTeacherSubjectAssignments)
 router.get("/TeacherSubjectAssignments/all", getAllTeacherSubjectAssignments)
 router.put("/TeacherClasses", updateTeacherClasses)
-
-router.post('/TeacherAttendance/:id', teacherAttendance)
 
 // Notice
 
