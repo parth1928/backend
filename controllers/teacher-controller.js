@@ -51,6 +51,7 @@ const teacherLogIn = async (req, res) => {
                 teacher = await teacher.populate("teachSubjects", "subName sessions");
                 teacher = await teacher.populate("school", "schoolName");
                 teacher = await teacher.populate("teachSclass", "sclassName");
+                teacher = await teacher.populate("teachClasses", "sclassName");
                 
                 teacher = teacher.toObject();
                 delete teacher.password;
@@ -76,7 +77,8 @@ const getTeachers = async (req, res) => {
     try {
         let teachers = await Teacher.find({ school: req.params.id })
             .populate("teachSubjects", "subName")
-            .populate("teachSclass", "sclassName");
+            .populate("teachSclass", "sclassName")
+            .populate("teachClasses", "sclassName");
         if (teachers.length > 0) {
             let modifiedTeachers = teachers.map((teacher) => {
                 return { ...teacher._doc, password: undefined };
@@ -97,6 +99,7 @@ const getTeacherDetail = async (req, res) => {
             .populate("teachSubjects", "subName sessions")
             .populate("school", "schoolName")
             .populate("teachSclass", "sclassName")
+            .populate("teachClasses", "sclassName")
         if (teacher) {
             teacher.password = undefined;
             res.send(teacher);

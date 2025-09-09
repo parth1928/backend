@@ -10,6 +10,7 @@ const subjectCreate = async (req, res) => {
             sessions: subject.sessions,
             isLab: subject.isLab || false,
             batches: subject.batches || [],
+            teachers: subject.teachers || [],
         }));
 
         const existingSubjectBySubCode = await Subject.findOne({
@@ -27,6 +28,17 @@ const subjectCreate = async (req, res) => {
             }));
 
             const result = await Subject.insertMany(newSubjects);
+            
+            // Update teachers' subject lists for subjects that have teachers assigned
+            for (const subject of result) {
+                if (subject.teachers && subject.teachers.length > 0) {
+                    await Teacher.updateMany(
+                        { _id: { $in: subject.teachers } },
+                        { $addToSet: { teachSubjects: subject._id } }
+                    );
+                }
+            }
+            
             res.send(result);
         }
     } catch (err) {
@@ -81,6 +93,8 @@ const teacherSubjects = async (req, res) => {
 const classSubjects = async (req, res) => {
     try {
         let subjects = await Subject.find({ sclassName: req.params.id })
+            .populate("teachers", "name")
+            .populate("sclassName", "sclassName");
         if (subjects.length > 0) {
             res.send(subjects)
         } else {
@@ -196,38 +210,116 @@ const deleteSubjects = async (req, res) => {
     }
 };
 
+const updateSubjectTeachers = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { teachers } = req.body;
+
+        if (!Array.isArray(teachers)) {
+            return res.status(400).json({ message: 'Teachers must be an array' });
+        }
+
+        // Get the current subject to find previously assigned teachers
+        const currentSubject = await Subject.findById(id);
+        if (!currentSubject) {
+            return res.status(404).json({ message: 'Subject not found' });
+        }
+
+        const previousTeachers = currentSubject.teachers || [];
+
+        // Update the subject with new teachers
+        const updatedSubject = await Subject.findByIdAndUpdate(
+            id,
+            { teachers },
+            { new: true }
+        ).populate('teachers', 'name')
+         .populate('sclassName', 'sclassName');
+
+        if (!updatedSubject) {
+            return res.status(404).json({ message: 'Subject not found' });
+        }
+
+        // Update teacher subject lists
+        // Add subject to newly assigned teachers
+        const newTeachers = teachers.filter(teacherId => !previousTeachers.includes(teacherId));
+        for (const teacherId of newTeachers) {
+            await Teacher.findByIdAndUpdate(
+                teacherId,
+                { $addToSet: { teachSubjects: id } }
+            );
+        }
+
+        // Remove subject from previously assigned teachers who are no longer assigned
+        const removedTeachers = previousTeachers.filter(teacherId => !teachers.includes(teacherId.toString()));
+        for (const teacherId of removedTeachers) {
+            await Teacher.findByIdAndUpdate(
+                teacherId,
+                { $pull: { teachSubjects: id } }
+            );
+        }
+
+        res.json(updatedSubject);
+    } catch (error) {
+        console.error('Error updating subject teachers:', error);
+        res.status(500).json({ message: 'Failed to update subject teachers', error: error.message });
+    }
+};
+
 const deleteSubjectsByClass = async (req, res) => {
     try {
-        const deletedSubjects = await Subject.deleteMany({ sclassName: req.params.id });
+        const classId = req.params.id;
+        console.log('Deleting subjects for class ID:', classId);
 
-        // Set the teachSubject field to null in teachers
+        // Find all subjects for this class
+        const subjectsToDelete = await Subject.find({ sclassName: classId });
+
+        if (subjectsToDelete.length === 0) {
+            return res.status(404).json({ message: "No subjects found for this class" });
+        }
+
+        // Delete all subjects for this class
+        const deletedSubjects = await Subject.deleteMany({ sclassName: classId });
+
+        // Update teachers who had these subjects assigned
+        const subjectIds = subjectsToDelete.map(subject => subject._id);
         await Teacher.updateMany(
-            { teachSubject: { $in: deletedSubjects.map(subject => subject._id) } },
-            { $unset: { teachSubject: "" }, $unset: { teachSubject: null } }
+            { teachSubjects: { $in: subjectIds } },
+            { $pull: { teachSubjects: { $in: subjectIds } } }
         );
 
-        // Set examResult and attendance to null in all students
+        // Remove attendance records for these subjects from students
         await Student.updateMany(
-            {},
-            { $set: { examResult: null, attendance: null } }
+            { 'attendance.subName': { $in: subjectIds } },
+            { $pull: { attendance: { subName: { $in: subjectIds } } } }
         );
 
-        res.send(deletedSubjects);
+        // Remove exam results for these subjects from students
+        await Student.updateMany(
+            { 'examResult.subName': { $in: subjectIds } },
+            { $pull: { examResult: { subName: { $in: subjectIds } } } }
+        );
+
+        console.log(`Deleted ${deletedSubjects.deletedCount} subjects for class ${classId}`);
+        res.status(200).json({
+            message: `Deleted ${deletedSubjects.deletedCount} subjects for class ${classId}`,
+            deletedCount: deletedSubjects.deletedCount
+        });
     } catch (error) {
-    // ...removed for production...
-        res.status(500).json(error);
+        console.error('Error deleting subjects by class:', error);
+        res.status(500).json({ message: 'Error deleting subjects by class', error: error.message });
     }
 };
 
 
-module.exports = { 
-    subjectCreate, 
-    freeSubjectList, 
-    classSubjects, 
-    getSubjectDetail, 
-    deleteSubjectsByClass, 
-    deleteSubjects, 
-    deleteSubject, 
+module.exports = {
+    subjectCreate,
+    freeSubjectList,
+    classSubjects,
+    getSubjectDetail,
+    deleteSubjectsByClass,
+    deleteSubjects,
+    deleteSubject,
     allSubjects,
-    teacherSubjects 
+    teacherSubjects,
+    updateSubjectTeachers
 };

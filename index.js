@@ -22,26 +22,29 @@ dotenv.config();
 app.use(compression())
 app.use(express.json({ limit: '10mb' }))
 
-// Request logging middleware for debugging
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} | ${req.method} ${req.url} | Origin: ${req.headers.origin || 'No origin'} | Content-Type: ${req.headers['content-type'] || 'No content-type'}`);
-    next();
-});
+// Request logging middleware for debugging (only in development)
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+        console.log(`${new Date().toISOString()} | ${req.method} ${req.url} | Origin: ${req.headers.origin || 'No origin'}`);
+        next();
+    });
+}
 
 // CORS Configuration
 const corsOptions = {
     origin: function (origin, callback) {
-        console.log('CORS request from origin:', origin);
-        
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         // List of allowed origins
         const allowedOrigins = [
             'http://localhost:3000',
             'http://192.168.1.128:3000',  // Allow your local IP
             'https://bejewelled-sunburst-042cd0.netlify.app',
-            'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app'
+            'https://68754ae3af77a70008c8a8c6--bejewelled-sunburst-042cd0.netlify.app',
+            'https://backend-a2q3.onrender.com',  // Allow Render backend
+            // Allow any frontend deployed on Netlify
+            ...(origin && origin.includes('netlify.app') ? [origin] : [])
         ];
 
         // Check if the origin is allowed
@@ -63,6 +66,11 @@ app.use(cors(corsOptions));
 // Pre-flight requests
 app.options('*', cors(corsOptions));
 
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 mongoose
     .connect(process.env.MONGO_URL, {
         useNewUrlParser: true,
@@ -79,7 +87,8 @@ app.use('/', Routes);
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`MongoDB connection: ${process.env.MONGO_URL ? 'Configured' : 'Not configured'}`);
-    console.log(`CORS allowed origins: http://localhost:3000, http://192.168.1.128:3000, and domains ending with netlify.app`);
-    console.log(`Auth routes: /AdminLogin, /StudentLogin, /TeacherLogin, /CoordinatorLogin`);
+    console.log(`CORS allowed origins: localhost:3000, Netlify apps, and Render backend`);
+    console.log(`Health check available at: /health`);
 })

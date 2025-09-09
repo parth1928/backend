@@ -50,10 +50,6 @@ const downloadAttendanceExcel = async (req, res) => {
             const batch = subjectInfo.batches.find(b => b.batchName === batchName);
             if (batch) {
                 batchStudentIds = batch.students.map(id => id.toString());
-                
-                // If this is a lab subject with batches, filter D2D students
-                // For D2D students, we include them in all batches since they typically attend all sessions
-                // Don't filter dtodStudents - keep them all for lab batches
             }
         }
 
@@ -169,41 +165,53 @@ const downloadAttendanceExcel = async (req, res) => {
         });
 
         // Add a section title for D2D students if there are any
+        let hasFilteredDtodStudents = false;
         if (dtodStudents.length > 0) {
-            data.push([]);  // Empty row for spacing
-            data.push(["D2D Students"]);
+            // Filter D2D students by batch if batch is specified for lab subjects
+            let filteredDtodStudents = dtodStudents;
+            if (batchName && subjectInfo.isLab && batchStudentIds.length > 0) {
+                filteredDtodStudents = dtodStudents.filter(student => 
+                    batchStudentIds.includes(student._id.toString())
+                );
+            }
             
-            // Add D2D student rows
-            dtodStudents.forEach(student => {
-                const row = [student.rollNum, `${student.name} (D2D)`];
-                let presentCount = 0;
-                let totalEntries = 0;
+            if (filteredDtodStudents.length > 0) {
+                hasFilteredDtodStudents = true;
+                data.push([]);  // Empty row for spacing
+                data.push(["D2D Students"]);
                 
-                dateColumns.forEach(({ dateStr, occurrence }) => {
-                    // Get all attendance entries for this date and subject
-                    const dateAttendances = student.attendance?.filter(a =>
-                        a.subName && 
-                        (a.subName._id?.toString() === subjectId || a.subName.toString() === subjectId) &&
-                        new Date(a.date).toISOString().slice(0, 10) === dateStr
-                    ).sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
+                // Add D2D student rows
+                filteredDtodStudents.forEach(student => {
+                    const row = [student.rollNum, `${student.name} (D2D)`];
+                    let presentCount = 0;
+                    let totalEntries = 0;
                     
-                    // Get the attendance for this specific occurrence if it exists
-                    const attendance = occurrence <= dateAttendances.length ? dateAttendances[occurrence - 1] : null;
+                    dateColumns.forEach(({ dateStr, occurrence }) => {
+                        // Get all attendance entries for this date and subject
+                        const dateAttendances = student.attendance?.filter(a =>
+                            a.subName && 
+                            (a.subName._id?.toString() === subjectId || a.subName.toString() === subjectId) &&
+                            new Date(a.date).toISOString().slice(0, 10) === dateStr
+                        ).sort((a, b) => new Date(a.date) - new Date(b.date)) || [];
+                        
+                        // Get the attendance for this specific occurrence if it exists
+                        const attendance = occurrence <= dateAttendances.length ? dateAttendances[occurrence - 1] : null;
+                        
+                        if (attendance) {
+                            totalEntries++;
+                            const status = attendance.status === 'Present' ? 'P' : 'A';
+                            if (status === 'P') presentCount++;
+                            row.push(status);
+                        } else {
+                            row.push(''); // No attendance entry for this occurrence
+                        }
+                    });
                     
-                    if (attendance) {
-                        totalEntries++;
-                        const status = attendance.status === 'Present' ? 'P' : 'A';
-                        if (status === 'P') presentCount++;
-                        row.push(status);
-                    } else {
-                        row.push(''); // No attendance entry for this occurrence
-                    }
+                    const percentage = totalEntries ? ((presentCount / totalEntries) * 100).toFixed(2) + '%' : '0%';
+                    row.push(percentage);
+                    data.push(row);
                 });
-                
-                const percentage = totalEntries ? ((presentCount / totalEntries) * 100).toFixed(2) + '%' : '0%';
-                row.push(percentage);
-                data.push(row);
-            });
+            }
         }
 
         // Generate Excel file
@@ -218,11 +226,13 @@ const downloadAttendanceExcel = async (req, res) => {
             { s: { r: 2, c: 0 }, e: { r: 2, c: dateColumns.length + 2 } }
         ];
         
-        // Find D2D header row if it exists
-        for (let i = 4; i < data.length; i++) {
-            if (data[i].length === 1 && data[i][0] === "D2D Students") {
-                merges.push({ s: { r: i, c: 0 }, e: { r: i, c: dateColumns.length + 2 } });
-                break;
+        // Find D2D header row if it exists and was included
+        if (hasFilteredDtodStudents) {
+            for (let i = 4; i < data.length; i++) {
+                if (data[i].length === 1 && data[i][0] === "D2D Students") {
+                    merges.push({ s: { r: i, c: 0 }, e: { r: i, c: dateColumns.length + 2 } });
+                    break;
+                }
             }
         }
         

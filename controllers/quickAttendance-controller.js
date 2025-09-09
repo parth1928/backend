@@ -29,8 +29,19 @@ const quickMarkAttendance = async (req, res) => {
         let matchedStudent;
         if (isDtod) {
             // Find D2D students in the class
-            const students = await DtodStudent.find({ sclassName: classId, school: req.query.adminId });
+            let students = await DtodStudent.find({ sclassName: classId, school: req.query.adminId });
             console.log('Found D2D students in class:', students.map(s => ({ name: s.name, roll: s.rollNum })));
+            
+            // If it's a lab subject and batch is specified, filter D2D students
+            if (subject && subject.isLab && batchName) {
+                const batch = subject.batches.find(b => b.batchName === batchName);
+                if (batch) {
+                    const batchStudentIds = batch.students.map(id => id.toString());
+                    students = students.filter(student => batchStudentIds.includes(student._id.toString()));
+                    console.log('After batch filter for D2D:', students.map(s => ({ name: s.name, roll: s.rollNum })));
+                }
+            }
+            
             matchedStudent = students.find(student => {
                 const rollStr = student.rollNum.toString();
                 const suffix = rollStr.slice(-2).padStart(2, '0');
@@ -116,25 +127,32 @@ const submitQuickAttendance = async (req, res) => {
 
         // Get subject details and all students in the class
         const subject = await Subject.findById(subjectId);
-        let allStudents = await Student.find({ sclassName: classId });
+        let allRegularStudents = await Student.find({ sclassName: classId });
+        let allDtodStudents = await DtodStudent.find({ sclassName: classId });
 
         // For lab subjects, only process batch students; leave others untouched
-        let studentsToUpdate = allStudents;
+        let regularStudentsToUpdate = allRegularStudents;
+        let dtodStudentsToUpdate = allDtodStudents;
+        
         if (subject.isLab && batchName) {
             const batch = subject.batches.find(b => b.batchName === batchName);
             if (batch) {
                 const batchStudentIds = batch.students.map(id => id.toString());
-                studentsToUpdate = allStudents.filter(student => batchStudentIds.includes(student._id.toString()));
+                regularStudentsToUpdate = allRegularStudents.filter(student => 
+                    batchStudentIds.includes(student._id.toString())
+                );
+                dtodStudentsToUpdate = allDtodStudents.filter(student => 
+                    batchStudentIds.includes(student._id.toString())
+                );
             } else {
-                studentsToUpdate = [];
+                regularStudentsToUpdate = [];
+                dtodStudentsToUpdate = [];
             }
         }
 
-        // Only update attendance for students in studentsToUpdate
-        const operations = studentsToUpdate.map(student => {
-            const isMarked = markedStudents.some(m => m.rollNum === student.rollNum);
-            // For lab: only mark batch students; for non-lab: mark all
-            // For lab, students not in batch are not processed at all
+        // Process regular students
+        const regularOperations = regularStudentsToUpdate.map(student => {
+            const isMarked = markedStudents.some(m => m.rollNum === student.rollNum && !m.isDtod);
             const status = mode === 'present' ? 
                 (isMarked ? 'Present' : 'Absent') : 
                 (isMarked ? 'Absent' : 'Present');
@@ -158,7 +176,34 @@ const submitQuickAttendance = async (req, res) => {
             return student.save();
         });
 
-        await Promise.all(operations);
+        // Process D2D students
+        const dtodOperations = dtodStudentsToUpdate.map(student => {
+            const isMarked = markedStudents.some(m => m.rollNum === student.rollNum && m.isDtod);
+            const status = mode === 'present' ? 
+                (isMarked ? 'Present' : 'Absent') : 
+                (isMarked ? 'Absent' : 'Present');
+
+            // Find existing record or create new one
+            const existingRecord = student.attendance.find(a => 
+                a.subName.toString() === subjectId &&
+                new Date(a.date).toISOString().slice(0,10) === date
+            );
+
+            if (existingRecord) {
+                existingRecord.status = status;
+            } else {
+                student.attendance.push({
+                    subName: subjectId,
+                    date: new Date(date),
+                    status
+                });
+            }
+
+            return student.save();
+        });
+
+        // Execute all operations
+        await Promise.all([...regularOperations, ...dtodOperations]);
 
         res.json({ 
             success: true, 
